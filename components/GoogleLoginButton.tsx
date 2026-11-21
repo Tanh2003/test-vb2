@@ -54,10 +54,11 @@ export default function GoogleLoginButton({
 
       router.push(redirectTo);
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Google Sign-In Error:', err);
-      if (err?.code !== 'auth/popup-closed-by-user') {
-        setError(err?.message || 'Có lỗi xảy ra khi đăng nhập bằng Google.');
+      const authErr = err as { code?: string; message?: string };
+      if (authErr?.code !== 'auth/popup-closed-by-user') {
+        setError(authErr?.message || 'Có lỗi xảy ra khi đăng nhập bằng Google.');
       }
     } finally {
       setIsLoading(false);
@@ -65,9 +66,9 @@ export default function GoogleLoginButton({
   };
 
   const baseStyle =
-    variant === 'light'
-      ? 'bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 shadow-sm'
-      : 'bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200';
+    variant === 'dark'
+      ? 'bg-[#0f2d22] hover:bg-[#184232] text-white shadow-sm'
+      : 'bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 shadow-sm';
 
   return (
     <div className="w-full">

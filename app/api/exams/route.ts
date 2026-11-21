@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PAPER_META, PaperCode } from '@/types/exam';
 
 const FIREBASE_DB_URL =
   'https://exam-vb2-default-rtdb.asia-southeast1.firebasedatabase.app';
@@ -18,14 +19,23 @@ export async function GET() {
     const data = await res.json();
     if (!data) return NextResponse.json([]);
 
-    const examList = Object.keys(data).map((key) => ({
-      ...data[key],
-      id: data[key].id || key,
-    }));
+    const examList = Object.keys(data).map((key) => {
+      const item = data[key];
+      const pCode = (item.paperCode || item.examCode || 'CA1') as PaperCode;
+      return {
+        ...item,
+        id: item.id || key,
+        paperCode: pCode,
+        examCode: pCode,
+        subject: item.subject || PAPER_META[pCode]?.subject || 'Môn thi VB2',
+        duration: item.duration || item.durationMinutes || 150,
+      };
+    });
 
     return NextResponse.json(examList.reverse());
-  } catch (error: any) {
-    console.error('Lỗi lấy danh sách đề thi từ Firebase REST:', error);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Lỗi lấy danh sách đề thi từ Firebase REST:', msg);
     return NextResponse.json([]);
   }
 }
@@ -34,17 +44,23 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const examId = body.id || `ca1_${Date.now()}`;
+    const paperCode = (body.paperCode || body.examCode || 'CA1') as PaperCode;
+    const examId = body.id || `${paperCode.toLowerCase()}_${Date.now()}`;
+
+    const payload = {
+      ...body,
+      id: examId,
+      paperCode,
+      examCode: paperCode,
+      subject: body.subject || PAPER_META[paperCode]?.subject || 'Môn thi VB2',
+      updatedAt: new Date().toISOString(),
+    };
 
     const res = await fetch(`${FIREBASE_DB_URL}/exams/${examId}.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...body,
-        id: examId,
-        updatedAt: new Date().toISOString(),
-      }),
-      signal: AbortSignal.timeout(5000),
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(6000),
     });
 
     if (!res.ok) {
@@ -52,10 +68,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, id: examId });
-  } catch (error: any) {
-    console.error('Lỗi ghi đề thi vào Firebase REST:', error);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Lỗi ghi đề thi vào Firebase REST:', msg);
     return NextResponse.json(
-      { error: error?.message || 'Không thể lưu đề thi vào Firebase.' },
+      { error: msg || 'Không thể lưu đề thi vào Firebase.' },
       { status: 500 }
     );
   }

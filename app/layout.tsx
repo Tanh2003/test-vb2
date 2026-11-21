@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Cổng Thi Trực Tuyến Văn Bằng 2 CAND - Mã Đề CA1',
-  description: 'Phần mềm thi trực tuyến tuyển sinh Văn bằng 2 CAND',
+  title: 'Cổng Thi Trực Tuyến Tuyển Sinh Văn Bằng 2 CAND',
+  description: 'Phần mềm thi trực tuyến tuyển sinh Văn bằng 2 CAND chuẩn cấu trúc 4 mã đề',
 };
 
 export default function RootLayout({
@@ -20,7 +20,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className="min-h-full flex flex-col bg-slate-900 text-slate-100 font-sans">
+      <body className="min-h-full flex flex-col bg-[#f7f8f7] text-slate-800 font-sans antialiased">
         {children}
       </body>
     </html>

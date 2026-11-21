@@ -3,6 +3,7 @@
 import React from 'react';
 import { useExamStore } from '@/store/useExamStore';
 import { FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import MathText from '@/components/common/MathText';
 
 interface EssayTabProps {
   questionPrompt?: string;
@@ -22,24 +23,24 @@ export const EssayTab: React.FC<EssayTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Khung đề bài */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-semibold text-slate-400">
-            <FileText className="w-4 h-4 text-amber-500" />
+      {/* Khung đề bài (Nền trắng sang trọng) */}
+      <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-extrabold text-[#0f2d22]">
+            <FileText className="w-4 h-4 text-amber-600" />
             <span>Phần I: Nghị Luận Xã Hội</span>
           </div>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            30 Điểm (Tối thiểu 500 chữ)
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+            30 Điểm &bull; Tối thiểu 500 chữ
           </span>
         </div>
-        <p className="text-slate-200 text-sm sm:text-base leading-relaxed text-justify">
-          {questionPrompt}
-        </p>
+        <div className="text-slate-800 text-sm sm:text-base leading-relaxed text-justify">
+          <MathText text={questionPrompt} />
+        </div>
       </div>
 
       {/* Khung nhập bài tự luận */}
-      <div className="relative bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-inner">
+      <div className="relative bg-white border border-slate-200/90 rounded-3xl p-5 shadow-sm">
         <textarea
           spellCheck={false}
           autoComplete="off"
@@ -48,27 +49,27 @@ export const EssayTab: React.FC<EssayTabProps> = ({
           onChange={(e) => updateEssay(e.target.value)}
           placeholder="Nhập nội dung bài làm tự luận của bạn tại đây..."
           rows={18}
-          className="w-full bg-transparent text-slate-100 placeholder-slate-600 resize-y focus:outline-none text-sm sm:text-base leading-relaxed font-sans pb-12"
+          className="w-full bg-slate-50/50 border border-slate-300 rounded-2xl p-5 text-slate-900 placeholder-slate-400 resize-y focus:outline-none focus:border-[#0f2d22] focus:bg-white text-sm sm:text-base leading-relaxed font-sans pb-16 transition"
         />
 
-        {/* Bộ đếm số chữ ở góc dưới bên phải */}
-        <div className="absolute bottom-3 right-4">
+        {/* Bộ đếm số chữ */}
+        <div className="absolute bottom-4 right-6">
           <div
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border backdrop-blur transition-all ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold border shadow-xs transition-all ${
               isSatisfied
-                ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-400 shadow-sm shadow-emerald-500/10'
-                : 'bg-red-950/80 border-red-500/40 text-red-400 shadow-sm shadow-red-500/10'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                : 'bg-red-50 border-red-300 text-red-700'
             }`}
           >
             {isSatisfied ? (
               <>
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 <span>{wordCount} chữ (Đạt yêu cầu)</span>
               </>
             ) : (
               <>
-                <AlertCircle className="w-4 h-4" />
-                <span>{wordCount}/500 chữ &bull; Chưa đạt tối thiểu 500 chữ</span>
+                <AlertCircle className="w-4 h-4 text-red-500" />
+                <span>{wordCount}/500 chữ &bull; Chưa đủ 500 chữ</span>
               </>
             )}
           </div>

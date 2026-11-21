@@ -33,30 +33,56 @@ export default function HomePage() {
 
   const freeExams = [
     {
-      id: 'CA1-FREE-01',
-      title: '[TÊN ĐỀ MIỄN PHÍ 1]',
+      id: 'CA1',
+      title: 'Đề minh hoạ CA1 - Tự luận & Toán cao cấp',
       meta: 'CA1 · 50 câu · 150 phút',
       tag: 'Miễn phí',
     },
     {
-      id: 'CA1-FREE-02',
-      title: '[TÊN ĐỀ MIỄN PHÍ 2]',
-      meta: 'CA1 · 50 câu · 150 phút',
+      id: 'CA2',
+      title: 'Đề minh hoạ CA2 - Tự luận & Kinh tế vĩ mô',
+      meta: 'CA2 · 50 câu · 150 phút',
       tag: 'Miễn phí',
     },
     {
-      id: 'CA1-FREE-03',
-      title: '[TÊN ĐỀ MIỄN PHÍ 3]',
-      meta: 'CA1 · 50 câu · 150 phút',
+      id: 'CA3',
+      title: 'Đề minh hoạ CA3 - Tự luận & Triết học Mác - Lênin',
+      meta: 'CA3 · 60 câu · 150 phút',
+      tag: 'Miễn phí',
+    },
+    {
+      id: 'CA4',
+      title: 'Đề minh hoạ CA4 - Tự luận & Nhà nước và pháp luật',
+      meta: 'CA4 · 60 câu · 150 phút',
       tag: 'Miễn phí',
     },
   ];
 
   const caCategories = [
-    { code: 'CA1', desc: '[CÁCH UPLOAD CA1]', count: 0 },
-    { code: 'CA2', desc: '[CÁCH UPLOAD CA2]', count: 0 },
-    { code: 'CA3', desc: '[CÁCH UPLOAD CA3]', count: 0 },
-    { code: 'CA4', desc: '[CÁCH UPLOAD CA4]', count: 0 },
+    {
+      code: 'CA1',
+      subject: 'Toán cao cấp',
+      desc: 'Tự luận Xã hội (30đ) & Toán cao cấp (70đ: 45 trắc nghiệm + 5 trả lời ngắn)',
+      count: 1,
+    },
+    {
+      code: 'CA2',
+      subject: 'Kinh tế vĩ mô',
+      desc: 'Tự luận Xã hội (30đ) & Kinh tế vĩ mô (70đ: 45 trắc nghiệm + 5 trả lời ngắn)',
+      count: 1,
+    },
+    {
+      code: 'CA3',
+      subject: 'Triết học Mác - Lênin',
+      desc: 'Tự luận Xã hội (30đ) & Triết học Mác - Lênin (70đ: 54 trắc nghiệm + 6 điền khuyết)',
+      count: 1,
+    },
+    {
+      code: 'CA4',
+      subject: 'Nhà nước và pháp luật',
+      desc: 'Tự luận Xã hội (30đ) & Nhà nước và pháp luật (70đ: 54 trắc nghiệm + 6 tình huống)',
+      count: 1,
+    },
   ];
 
   return (
@@ -225,7 +251,7 @@ export default function HomePage() {
                   <p className="text-xs text-slate-500 mb-6">{exam.meta}</p>
                 </div>
                 <button
-                  onClick={() => router.push('/select-exam')}
+                  onClick={() => router.push(`/exam?ca=${exam.id}`)}
                   className="w-full py-2.5 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white font-semibold text-sm transition active:scale-[0.98] cursor-pointer"
                 >
                   Làm bài
@@ -277,8 +303,8 @@ export default function HomePage() {
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-base font-bold text-slate-900">
-                      {ca.code}
+                    <span className="text-sm font-bold text-slate-900">
+                      {ca.code} &bull; {ca.subject}
                     </span>
                     <span className="text-xs text-slate-400 font-medium">
                       {ca.count} đề

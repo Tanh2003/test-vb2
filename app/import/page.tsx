@@ -3,104 +3,178 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2, FileCheck, CheckCircle2 } from 'lucide-react';
+import {
+  Loader2,
+  FileCheck,
+  CheckCircle2,
+  Upload,
+  FileText,
+  AlertCircle,
+  HelpCircle,
+  Sparkles,
+  ArrowRight,
+  BookOpen,
+  Layers,
+  Clock,
+  X,
+  PlayCircle,
+} from 'lucide-react';
 import { ParsedExamPreview, ParsedData } from '@/components/admin/ParsedExamPreview';
-import { SAMPLE_PARSED_CA1 } from '@/mock/mock-ca1';
+import { PaperCode, PAPER_META } from '@/types/exam';
+import { SAMPLES_BY_CODE } from '@/mock/mock-samples';
 
 function UploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const answerFileInputRef = useRef<HTMLInputElement>(null);
 
-  const initialCa = searchParams.get('ca') || 'CA1';
-  const [selectedCa, setSelectedCa] = useState<string>(initialCa);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [examName, setExamName] = useState('Đề thi thử CA1 - Bộ Công An 2026');
+  const initialCa = (searchParams.get('ca')?.toUpperCase() as PaperCode) || 'CA1';
+  const [selectedCa, setSelectedCa] = useState<PaperCode>(
+    ['CA1', 'CA2', 'CA3', 'CA4'].includes(initialCa) ? initialCa : 'CA1'
+  );
+
+  const [examFile, setExamFile] = useState<File | null>(null);
+  const [answerFile, setAnswerFile] = useState<File | null>(null);
+
+  const [examTitle, setExamTitle] = useState(
+    `Đề thi thử ${initialCa} - ${PAPER_META[initialCa]?.subject || ''} Bộ Công An 2026`
+  );
   const [examDuration, setExamDuration] = useState('150');
-  const [paymentMethod, setPaymentMethod] = useState<'QR' | 'WALLET' | 'BANK'>('QR');
 
   const [isParsing, setIsParsing] = useState(false);
+  const [parsingStep, setParsingStep] = useState<string>('');
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [savedExamId, setSavedExamId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<{ fullName?: string; sbd?: string; username?: string } | null>(null);
 
+  // Load candidate info from localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem('candidate_info');
       if (stored) {
-        const u = JSON.parse(stored);
-        setCandidate(u);
+        setCandidate(JSON.parse(stored));
       }
     } catch (e) {
       console.error(e);
     }
   }, []);
 
-  const caDescMap: Record<string, string> = {
-    CA1: '[CÁCH UPLOAD CA1] - Tự luận Xã hội & Toán cao cấp',
-    CA2: '[CÁCH UPLOAD CA2] - Tự luận Xã hội & Triết học Mác - Lênin',
-    CA3: '[CÁCH UPLOAD CA3] - Tự luận Xã hội & Địa lý kinh tế',
-    CA4: '[CÁCH UPLOAD CA4] - Tự luận Xã hội & Lịch sử',
+  // Update default title when selectedCa changes
+  const handleSelectCa = (ca: PaperCode) => {
+    setSelectedCa(ca);
+    setExamTitle(`Đề thi thử ${ca} - ${PAPER_META[ca]?.subject || ''} Bộ Công An 2026`);
+    setErrorMessage(null);
   };
 
-  const handleFileDrop = (e: React.DragEvent) => {
+  // Quick load sample data
+  const handleLoadSample = (ca: PaperCode) => {
+    setSelectedCa(ca);
+    const sample = SAMPLES_BY_CODE[ca] || SAMPLES_BY_CODE.CA1;
+    const cloned = JSON.parse(JSON.stringify(sample));
+    setParsedData(cloned);
+    setExamTitle(cloned.examTitle || `Đề thi thử ${ca} - ${PAPER_META[ca]?.subject || ''} 2026`);
+    setExamDuration(String(cloned.durationMinutes || 150));
+    setSavedExamId(null);
+    setErrorMessage(null);
+  };
+
+  // Drag & drop handlers for Exam PDF
+  const handleExamDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files?.[0]) {
       const file = e.dataTransfer.files[0];
       if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        setSelectedFile(file);
+        setExamFile(file);
+        setErrorMessage(null);
       } else {
-        alert('Chỉ nhận file định dạng .pdf!');
+        alert('Chỉ nhận file đề thi định dạng .pdf!');
       }
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      setSelectedFile(e.target.files[0]);
+  // Drag & drop handlers for Answer PDF
+  const handleAnswerDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.[0]) {
+      const file = e.dataTransfer.files[0];
+      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        setAnswerFile(file);
+      } else {
+        alert('Chỉ nhận file đáp án định dạng .pdf!');
+      }
     }
   };
 
+  // Submit and call Gemini extraction API
   const handleSubmit = async () => {
-    if (!selectedFile && !parsedData) {
+    if (!examFile && !parsedData) {
       alert('Vui lòng chọn hoặc kéo thả file đề thi PDF!');
       return;
     }
 
     setIsParsing(true);
+    setErrorMessage(null);
+    setParsingStep('Đang tải tệp PDF lên máy chủ...');
+
     try {
       const formData = new FormData();
-      if (selectedFile) formData.append('file', selectedFile);
+      if (examFile) formData.append('file', examFile);
+      if (answerFile) formData.append('answerFile', answerFile);
+      formData.append('paperCode', selectedCa);
+      formData.append('examTitle', examTitle);
+      formData.append('durationMinutes', examDuration);
+
+      setParsingStep('AI Gemini đang phân tích thị giác và bóc tách cấu trúc 4 dạng câu...');
 
       const res = await fetch('/api/admin/import-pdf', {
         method: 'POST',
         body: formData,
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setParsedData(data);
-      } else {
-        // Fallback sử dụng dữ liệu bóc tách mẫu CA1 khi API AI chưa cấu hình
-        setParsedData(SAMPLE_PARSED_CA1 as unknown as ParsedData);
+      if (!res.ok) {
+        throw new Error(`Máy chủ trả về mã lỗi: ${res.status}`);
       }
-    } catch {
-      // Fallback khi offline hoặc kiểm thử
-      setParsedData(SAMPLE_PARSED_CA1 as unknown as ParsedData);
+
+      setParsingStep('Đang chuẩn hóa công thức LaTeX và kiểm tra tính toàn vẹn...');
+      const data = await res.json();
+
+      setParsedData(data);
+      if (data.id) {
+        setSavedExamId(data.id);
+      }
+    } catch (err: any) {
+      console.warn('Lỗi gọi API AI, nạp dữ liệu mẫu dự phòng:', err?.message || err);
+      // Fallback thông minh: Dùng mẫu chuẩn hóa của chính mã đề đang chọn
+      const fallback = JSON.parse(JSON.stringify(SAMPLES_BY_CODE[selectedCa] || SAMPLES_BY_CODE.CA1));
+      fallback.warnings = [
+        ...(fallback.warnings || []),
+        'Lưu ý: Không thể kết nối tới mô hình AI (hết hạn mức hoặc không phản hồi). Đã nạp mẫu chuẩn cấu trúc của đề ' + selectedCa + ' để bạn tiếp tục kiểm thử.',
+      ];
+      setParsedData(fallback);
     } finally {
       setIsParsing(false);
+      setParsingStep('');
     }
   };
 
+  // Save to DB (Firebase & LocalStorage)
   const handleSaveToDb = async () => {
     if (!parsedData) return;
     setIsSaving(true);
     try {
+      const examId = savedExamId || `${selectedCa.toLowerCase()}_${Date.now()}`;
       const payload = {
         ...parsedData,
-        examName: examName || parsedData.examCode,
-        durationMinutes: parseInt(examDuration) || 150,
+        id: examId,
+        paperCode: selectedCa,
+        examCode: selectedCa,
+        subject: PAPER_META[selectedCa]?.subject || '',
+        title: examTitle || parsedData.examTitle || `Đề thi ${selectedCa}`,
+        duration: parseInt(examDuration, 10) || 150,
+        durationMinutes: parseInt(examDuration, 10) || 150,
       };
 
       await fetch('/api/exams', {
@@ -109,22 +183,23 @@ function UploadContent() {
         body: JSON.stringify(payload),
       });
 
-      localStorage.setItem(`parsed_exam_${parsedData.examCode}`, JSON.stringify(payload));
-      setSaveSuccess(true);
-      setTimeout(() => router.push('/select-exam'), 1200);
-    } catch {
-      localStorage.setItem(`parsed_exam_${parsedData.examCode}`, JSON.stringify(parsedData));
-      setSaveSuccess(true);
-      setTimeout(() => router.push('/select-exam'), 1200);
+      localStorage.setItem(`parsed_exam_${selectedCa}`, JSON.stringify(payload));
+      localStorage.setItem(`exam_current_${examId}`, JSON.stringify(payload));
+      setSavedExamId(examId);
+    } catch (e) {
+      console.error(e);
+      localStorage.setItem(`parsed_exam_${selectedCa}`, JSON.stringify(parsedData));
     } finally {
       setIsSaving(false);
     }
   };
 
+  const meta = PAPER_META[selectedCa];
+
   return (
     <div className="min-h-screen bg-[#f7f8f7] text-slate-800 font-sans flex flex-col justify-between">
       {/* 1. HEADER (XANH RÊU CAND) */}
-      <header className="bg-[#0f2d22] text-white">
+      <header className="bg-[#0f2d22] text-white sticky top-0 z-40 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between border-b border-emerald-900/60">
           <Link href="/" className="flex items-center gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 relative flex items-center justify-center shrink-0">
@@ -146,7 +221,7 @@ function UploadContent() {
                 THI ONLINE VB2
               </div>
               <div className="text-[11px] text-slate-200/90 font-medium">
-                Văn bằng 2 Công an
+                Văn bằng 2 Công an nhân dân
               </div>
             </div>
           </Link>
@@ -155,14 +230,23 @@ function UploadContent() {
             <Link href="/" className="text-emerald-100/80 hover:text-white transition">
               Thư viện đề
             </Link>
-            <Link href="/import" className="text-white font-semibold underline underline-offset-4 decoration-amber-400">
+            <Link
+              href="/import"
+              className="text-white font-semibold underline underline-offset-4 decoration-amber-400"
+            >
               Upload đề
+            </Link>
+            <Link href="/select-exam" className="text-emerald-100/80 hover:text-white transition">
+              Ngân hàng đề thi
             </Link>
             <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
               Lịch sử làm đề
             </Link>
             {candidate ? (
-              <Link href="/profile" className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs sm:text-sm pl-2 transition">
+              <Link
+                href="/profile"
+                className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs sm:text-sm pl-2 transition"
+              >
                 [{candidate.fullName || candidate.sbd || candidate.username || 'TÀI KHOẢN'}]
               </Link>
             ) : (
@@ -187,242 +271,427 @@ function UploadContent() {
 
       {/* 2. MAIN CONTAINER */}
       <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 flex-1">
-        {/* Title & Steps */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0f2d22] mb-3">
-            Upload đề PDF
-          </h1>
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs sm:text-sm">
+        {/* Title & Pipeline Steps */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0f2d22] mb-2">
+              Upload & Bóc Tách Đề Thi Tuyển Sinh VB2
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600">
+              Hỗ trợ 4 mã đề chuyên ngành (CA1, CA2, CA3, CA4) với công nghệ AI đọc PDF & chuẩn hóa LaTeX tự động.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm">
             <div className="flex items-center gap-2 font-bold text-[#0f2d22]">
               <span className="w-6 h-6 rounded-full bg-[#0f2d22] text-white flex items-center justify-center text-xs">
                 1
               </span>
-              <span>Tải PDF</span>
+              <span>Chọn mã đề & Tải PDF</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-400 font-medium">
-              <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs">
+            <ArrowRight className="w-3.5 h-3.5 text-slate-300" />
+            <div className={`flex items-center gap-2 font-bold ${isParsing ? 'text-[#0f2d22]' : 'text-slate-400'}`}>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${isParsing ? 'bg-[#0f2d22] text-white' : 'bg-slate-200 text-slate-600'}`}>
                 2
               </span>
-              <span>Thông tin đề</span>
+              <span>AI Bóc tách</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-400 font-medium">
-              <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs">
+            <ArrowRight className="w-3.5 h-3.5 text-slate-300" />
+            <div className={`flex items-center gap-2 font-bold ${parsedData ? 'text-[#0f2d22]' : 'text-slate-400'}`}>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${parsedData ? 'bg-[#0f2d22] text-white' : 'bg-slate-200 text-slate-600'}`}>
                 3
               </span>
-              <span>Thanh toán (từ lần 3)</span>
-            </div>
-            <div className="flex items-center gap-2 text-slate-400 font-medium">
-              <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs">
-                4
-              </span>
-              <span>Xử lý</span>
+              <span>Kiểm duyệt & Lưu</span>
             </div>
           </div>
         </div>
 
         {/* Notice Banner */}
-        <div className="bg-[#fffbeb] border border-amber-200/90 rounded-2xl p-4 text-xs sm:text-sm text-amber-900 font-medium">
-          Lượt tải miễn phí: còn 2/2. Lượt này miễn phí.
+        <div className="bg-[#fffbeb] border border-amber-200/90 rounded-2xl p-4 text-xs sm:text-sm text-amber-900 font-medium flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              Hệ thống đã cập nhật chuẩn cấu trúc 4 mã đề 2026: <strong>CA1 (Toán)</strong>, <strong>CA2 (Kinh tế)</strong>, <strong>CA3 (Triết học)</strong>, <strong>CA4 (Pháp luật)</strong>.
+            </span>
+          </div>
+          <span className="shrink-0 text-xs font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-full">
+            2/2 lượt miễn phí
+          </span>
         </div>
 
-        {/* Two-Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Cột trái: Form cấu hình & Drag/Drop */}
-          <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6">
-            {/* Chọn ca */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Chọn ca của đề
-              </label>
-              <div className="flex items-center gap-2">
-                {['CA1', 'CA2', 'CA3', 'CA4'].map((ca) => (
-                  <button
-                    key={ca}
-                    type="button"
-                    onClick={() => setSelectedCa(ca)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
-                      selectedCa === ca
-                        ? 'bg-[#0f2d22] text-white'
-                        : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {ca}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                {caDescMap[selectedCa] || `[CÁCH UPLOAD ${selectedCa}]`}
-              </p>
-            </div>
-
-            {/* Vùng Drag & Drop PDF */}
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleFileDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 rounded-2xl p-8 sm:p-12 text-center bg-slate-50/50 hover:bg-slate-50 transition cursor-pointer"
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,application/pdf"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <div className="space-y-2">
-                <p className="text-base sm:text-lg font-bold text-slate-800">
-                  {selectedFile ? selectedFile.name : 'Kéo thả file PDF vào đây'}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {selectedFile
-                    ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Nhấp để thay đổi file`
-                    : 'Chỉ nhận file .pdf, tối đa 20 MB'}
-                </p>
-                <button
-                  type="button"
-                  className="mt-3 inline-flex items-center px-5 py-2 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white text-xs sm:text-sm font-semibold transition"
+        {/* KHỐI 1: CHỌN MÃ ĐỀ (4 CARD CHUYÊN BIỆT) */}
+        <div className="space-y-3">
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            1. Chọn loại đề thi cần Upload:
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {(['CA1', 'CA2', 'CA3', 'CA4'] as const).map((ca) => {
+              const info = PAPER_META[ca];
+              const isSelected = selectedCa === ca;
+              return (
+                <div
+                  key={ca}
+                  onClick={() => handleSelectCa(ca)}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? 'border-[#0f2d22] bg-emerald-50/70 shadow-sm'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
                 >
-                  {selectedFile ? 'Đổi file khác' : 'Chọn file từ máy'}
-                </button>
-              </div>
-            </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-sm font-extrabold px-2.5 py-0.5 rounded-lg ${
+                          isSelected
+                            ? 'bg-[#0f2d22] text-white'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {ca}
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-500">
+                        {info.expectedQuestions} câu
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-sm text-slate-900 leading-tight">
+                      {info.subject}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      {info.description}
+                    </p>
+                  </div>
 
-            {/* Inputs: Tên bộ đề & Thời gian */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Tên bộ đề
-                </label>
-                <input
-                  type="text"
-                  value={examName}
-                  onChange={(e) => setExamName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Thời gian làm bài (phút)
-                </label>
-                <input
-                  type="number"
-                  value={examDuration}
-                  onChange={(e) => setExamDuration(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22]"
-                />
-              </div>
-            </div>
+                  <div className="pt-3 mt-3 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-600 font-medium">
+                    <span>Trắc nghiệm: 1..{info.mcqUntil}</span>
+                    <span>Tự luận: 30đ</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </div>
 
-          {/* Cột phải: Chi phí & Thanh toán */}
-          <div className="lg:col-span-4 bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm flex flex-col justify-between">
-            <div className="space-y-4">
-              <h2 className="text-lg font-bold text-slate-900">Chi phí</h2>
+        {/* NÚT THỬ NGHIỆM NHANH: NẠP DỮ LIỆU MẪU CỦA 4 MÃ ĐỀ */}
+        <div className="bg-slate-100/80 p-3.5 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-slate-700 font-semibold">
+            <BookOpen className="w-4 h-4 text-emerald-800" />
+            <span>Chưa có file PDF? Thử nghiệm ngay với đề mẫu chuẩn hoá:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {(['CA1', 'CA2', 'CA3', 'CA4'] as const).map((ca) => (
+              <button
+                key={`sample-${ca}`}
+                type="button"
+                onClick={() => handleLoadSample(ca)}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Mẫu {ca} ({PAPER_META[ca].subject})</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-              <div className="flex items-center justify-between text-sm text-slate-600">
-                <span>Lượt tải thứ 1/2</span>
-                <span className="font-semibold text-slate-900">0 đ</span>
+        {/* KHỐI 2: FORM TẢI PDF & CẤU HÌNH */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Cột trái: Vùng Upload 2 file (Đề thi + Đáp án) & Form cấu hình */}
+          <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Dropzone 1: File PDF Đề thi chính thức (Bắt buộc) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">
+                    File PDF Đề thi (Bắt buộc)
+                  </label>
+                  {examFile && (
+                    <button
+                      type="button"
+                      onClick={() => setExamFile(null)}
+                      className="text-[11px] text-red-500 hover:underline flex items-center gap-0.5"
+                    >
+                      <X className="w-3 h-3" /> Xoá file
+                    </button>
+                  )}
+                </div>
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleExamDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition cursor-pointer min-h-[170px] flex flex-col justify-center items-center ${
+                    examFile
+                      ? 'border-emerald-500 bg-emerald-50/50'
+                      : 'border-slate-300 bg-slate-50/50 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={(e) => e.target.files?.[0] && setExamFile(e.target.files[0])}
+                    className="hidden"
+                  />
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-slate-200 text-[#0f2d22] mx-auto flex items-center justify-center">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-800 line-clamp-1">
+                      {examFile ? examFile.name : `Kéo thả PDF đề thi ${selectedCa}`}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {examFile
+                        ? `${(examFile.size / 1024 / 1024).toFixed(2)} MB • Nhấp để đổi`
+                        : 'File .pdf tối đa 30MB (đọc cả công thức LaTeX & ma trận)'}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-base font-bold text-slate-900">Tổng</span>
-                <span className="text-xl font-bold text-slate-900">0 đ</span>
-              </div>
-
-              <div className="pt-3">
-                <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                  Từ lần thứ 3, phí 20.000 đ cho mỗi đề. Chọn cách thanh toán:
-                </p>
-                <div className="space-y-2 text-xs sm:text-sm text-slate-700">
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === 'QR'}
-                      onChange={() => setPaymentMethod('QR')}
-                      className="accent-[#0f2d22]"
-                    />
-                    <span>Chuyển khoản QR</span>
+              {/* Dropzone 2: File PDF Đáp án & Thang điểm (Tuỳ chọn) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">
+                    File PDF Đáp án & Hướng dẫn (Tuỳ chọn)
                   </label>
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === 'WALLET'}
-                      onChange={() => setPaymentMethod('WALLET')}
-                      className="accent-[#0f2d22]"
-                    />
-                    <span>Ví điện tử</span>
-                  </label>
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === 'BANK'}
-                      onChange={() => setPaymentMethod('BANK')}
-                      className="accent-[#0f2d22]"
-                    />
-                    <span>Thẻ ngân hàng</span>
-                  </label>
+                  {answerFile && (
+                    <button
+                      type="button"
+                      onClick={() => setAnswerFile(null)}
+                      className="text-[11px] text-red-500 hover:underline flex items-center gap-0.5"
+                    >
+                      <X className="w-3 h-3" /> Xoá file
+                    </button>
+                  )}
+                </div>
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleAnswerDrop}
+                  onClick={() => answerFileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition cursor-pointer min-h-[170px] flex flex-col justify-center items-center ${
+                    answerFile
+                      ? 'border-blue-500 bg-blue-50/50'
+                      : 'border-slate-300 bg-slate-50/50 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    ref={answerFileInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={(e) => e.target.files?.[0] && setAnswerFile(e.target.files[0])}
+                    className="hidden"
+                  />
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-slate-200 text-blue-700 mx-auto flex items-center justify-center">
+                      <FileCheck className="w-5 h-5" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-800 line-clamp-1">
+                      {answerFile ? answerFile.name : 'Đính kèm PDF đáp án (nếu có)'}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {answerFile
+                        ? `${(answerFile.size / 1024 / 1024).toFixed(2)} MB • Nhấp để đổi`
+                        : 'AI tự động trích xuất đáp án A-D & rubric tự luận'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 pt-4">
+            {/* Inputs: Tên bộ đề & Thời gian thi */}
+            <div className="space-y-4 pt-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Tên bộ đề hiển thị
+                </label>
+                <input
+                  type="text"
+                  value={examTitle}
+                  onChange={(e) => setExamTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Thời gian làm bài (phút)
+                  </label>
+                  <input
+                    type="number"
+                    value={examDuration}
+                    onChange={(e) => setExamDuration(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Năm tổ chức thi
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue="2026"
+                    disabled
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-sm text-slate-600 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cột phải: Thông tin xử lý & Bấm bóc tách */}
+          <div className="lg:col-span-4 bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm flex flex-col justify-between">
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">
+                Thông tin xử lý AI
+              </h2>
+
+              <div className="space-y-2.5 text-xs text-slate-600">
+                <div className="flex items-center justify-between">
+                  <span>Mã đề đã chọn:</span>
+                  <span className="font-extrabold text-[#0f2d22]">{selectedCa}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Môn thi:</span>
+                  <span className="font-semibold text-slate-900">{meta.subject}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Cấu trúc câu hỏi:</span>
+                  <span className="font-semibold text-slate-900">{meta.expectedQuestions} câu</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Thời gian thi:</span>
+                  <span className="font-semibold text-slate-900">{examDuration} phút</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Chi phí lượt tải:</span>
+                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    Miễn phí
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100">
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Công nghệ Gemini AI sẽ đọc toàn bộ hình ảnh và công thức Toán/LaTeX/bảng biểu, tự động phân loại thành 4 dạng câu:
+                </p>
+                <ul className="mt-2 text-[11px] text-slate-600 space-y-1 list-disc list-inside">
+                  <li>Trắc nghiệm đơn (MCQ)</li>
+                  <li>Trả lời ngắn số / tính toán</li>
+                  <li>Điền khuyết chỗ trống (Blank Pool)</li>
+                  <li>Trả lời ngắn khái niệm / điều luật</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4 space-y-3">
+              {isParsing && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-xs flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0 text-blue-600" />
+                  <span className="font-medium">{parsingStep}</span>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isParsing}
-                className="w-full py-3 px-4 bg-[#c1121f] hover:bg-[#a50f1a] font-bold rounded-xl text-sm sm:text-base text-white shadow-md shadow-red-950/20 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                disabled={isParsing || (!examFile && !parsedData)}
+                className="w-full py-3.5 px-4 bg-[#c1121f] hover:bg-[#a50f1a] font-bold rounded-xl text-sm sm:text-base text-white shadow-md shadow-red-950/20 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
                 {isParsing ? (
                   <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>AI đang đọc đề...</span>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Đang bóc tách đề...</span>
                   </span>
                 ) : (
-                  'Gửi đề (miễn phí)'
+                  'Bóc tách đề với AI Gemini'
                 )}
               </button>
-              <p className="text-xs text-slate-400 text-center mt-3 leading-normal">
-                Đề được xử lý thành bài thi online trong 1 - 2 phút.
+
+              <p className="text-[11px] text-slate-400 text-center leading-normal">
+                Quá trình xử lý kéo dài từ 20 đến 45 giây tuỳ độ dài file PDF.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Khu vực Xem trước & Lưu CSDL (Khi AI bóc tách xong) */}
+        {/* KHỐI 3: KHU VỰC XEM TRƯỚC, CHỈNH SỬA & LƯU CSDL */}
         {parsedData && (
-          <div className="mt-8 pt-8 border-t border-slate-200 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-[#0f2d22]">
-                Dữ liệu bóc tách từ AI (Xem trước & Chỉnh sửa)
-              </h2>
-              <button
-                onClick={handleSaveToDb}
-                disabled={isSaving}
-                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-sm transition cursor-pointer disabled:opacity-50"
-              >
-                {isSaving ? 'Đang lưu vào CSDL...' : 'Lưu Ngân hàng Đề'}
-              </button>
+          <div className="mt-10 pt-8 border-t-2 border-slate-200 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
+                  Bước 3: Kiểm duyệt & Lưu trữ
+                </span>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-[#0f2d22] mt-2">
+                  Dữ Liệu Bóc Tách Đề {parsedData.paperCode || selectedCa}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Bạn có thể trực tiếp chỉnh sửa nội dung câu hỏi, công thức LaTeX, phương án và đáp án đúng trước khi lưu.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveToDb}
+                  disabled={isSaving}
+                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-sm shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Lưu Ngân hàng Đề</span>
+                    </>
+                  )}
+                </button>
+
+                {savedExamId && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/exam?id=${savedExamId}`)}
+                    className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-sm shadow-md transition cursor-pointer flex items-center gap-2 active:scale-[0.98]"
+                  >
+                    <PlayCircle className="w-4 h-4" />
+                    <span>Vào Thi Ngay</span>
+                  </button>
+                )}
+              </div>
             </div>
 
-            {saveSuccess && (
-              <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 text-sm flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>Đã lưu thành công vào CSDL! Đang chuyển hướng về phòng thi...</span>
+            {savedExamId && (
+              <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-900 text-sm flex items-center justify-between">
+                <div className="flex items-center gap-2 font-medium">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span>
+                    Đề thi đã được lưu thành công vào Cơ sở dữ liệu với mã <strong>{savedExamId}</strong>!
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push('/select-exam')}
+                  className="text-xs font-bold text-emerald-800 underline hover:text-emerald-950"
+                >
+                  Xem trong danh sách đề thi &rarr;
+                </button>
               </div>
             )}
 
-            <ParsedExamPreview data={parsedData} onChange={(updated) => setParsedData(updated)} />
+            {/* Component Xem trước và chỉnh sửa 4 dạng câu hỏi */}
+            <ParsedExamPreview
+              data={parsedData}
+              onChange={(updated) => setParsedData(updated)}
+            />
           </div>
         )}
       </main>
 
       {/* 3. FOOTER */}
       <footer className="bg-[#0a2018] text-emerald-100/60 text-xs py-6 px-4 text-center mt-12 border-t border-emerald-950">
-        [THÔNG TIN LIÊN HỆ / HỖ TRỢ]
+        Hệ Thống Luyện Thi Trực Tuyến Tuyển Sinh Văn Bằng 2 Công An Nhân Dân &bull; Chuẩn hoá cấu trúc 4 mã đề CA1 - CA2 - CA3 - CA4
       </footer>
     </div>
   );
@@ -430,7 +699,14 @@ function UploadContent() {
 
 export default function AdminImportPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-500">Đang tải trang Upload...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#f7f8f7] flex items-center justify-center text-slate-500 text-sm">
+          <Loader2 className="w-6 h-6 animate-spin text-emerald-700 mr-2" />
+          <span>Đang tải giao diện Upload đề...</span>
+        </div>
+      }
+    >
       <UploadContent />
     </Suspense>
   );
