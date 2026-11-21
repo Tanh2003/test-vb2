@@ -1,0 +1,30 @@
+# PROJECT: WEB THI TRỰC TUYẾN VĂN BẰNG 2 CAND (MÃ ĐỀ CA1)
+
+## 1. TECH STACK & ARCHITECTURE
+- Framework: Next.js (App Router), TypeScript, Tailwind CSS.
+- Math Rendering: `react-katex` và `katex` (Bắt buộc cho môn Toán cao cấp CA1).
+- State Management: Zustand (quản lý trạng thái bài thi) + LocalStorage (lưu nháp).
+- Icons: `lucide-react`.
+
+## 2. TOKEN-SAVING CODING RULES (BẮT BUỘC TUÂN THỦ)
+- KHÔNG giải thích lý thuyết dài dòng trước và sau khi viết code. Chỉ trả về code và hướng dẫn chạy ngắn gọn (nếu cần).
+- KHÔNG dùng comment kiểu `// ... existing code ...` làm mất ngữ cảnh nếu file dưới 150 dòng. Nếu sửa file lớn, chỉ viết rõ hàm cần sửa.
+- KHÔNG viết CSS thuần, chỉ sử dụng class của Tailwind CSS.
+- Viết code dạng Modular: Tách nhỏ các Component (dưới 200 dòng/file) để dễ dàng gửi lại cho AI sửa lỗi mà không tốn token.
+- Sử dụng Type/Interface rõ ràng trong 1 file `types/exam.ts` dùng chung cho toàn dự án.
+
+## 3. DOMAIN RULES (QUY TẮC NGHIỆP VỤ CA1)
+- Tổng thời gian: 150 phút (9000 giây). Tổng điểm: 100.
+- Phần 1 (Tự luận): 1 câu Nghị luận xã hội (30 điểm). Yêu cầu đếm số chữ (word count), tối thiểu 500 chữ.
+- Phần 2 (Trắc nghiệm Toán cao cấp - 50 câu - 70 điểm):
+  + C01 - C39: Trắc nghiệm 4 lựa chọn (Câu đơn).
+  + C40 - C45: Trắc nghiệm 4 lựa chọn (Câu nhóm - gồm 2 đoạn ngữ liệu N1: C40-42, N2: C43-45).
+  + C46 - C50: Trắc nghiệm trả lời ngắn (Input chỉ nhận số nguyên, số thập phân hoặc phân số tối giản như `-5`, `1.25`, `3/4`).
+- Công thức tính Điểm Xét Tuyển (ĐXT): `ĐXT = (Điểm Bài Thi * 3 / 10) + Điểm Cộng` (Làm tròn 2 chữ số thập phân).
+
+## 4. ADMIN & QUESTION BANK RULES (QUẢN TRỊ NGÂN HÀNG ĐỀ)
+- AI Integration: Sử dụng `@google/genai` (model `gemini-2.5-flash`) với tính năng `responseSchema` để ép kiểu dữ liệu trả về luôn là JSON chuẩn.
+- Math Format: Mọi công thức toán học bóc tách từ file đề phải được bọc trong dấu `$` (inline) hoặc `$$` (block) theo chuẩn LaTeX. Ví dụ: `$\begin{pmatrix} 1 & 1 \\ -1 & 1 \end{pmatrix}$`.
+- Cognitive Levels (Mức độ nhận thức): Mỗi câu hỏi bắt buộc phải có trường `level` thuộc 1 trong 3 giá trị: `'BIET'` (20%), `'HIEU'` (30%), `'VAN_DUNG'` (50%).
+- Random Exam Generator (Thuật toán sinh đề): Khi tạo đề thi mới từ Ngân hàng câu hỏi cho mã CA1 (50 câu trắc nghiệm), thuật toán phải lấy ngẫu nhiên nhưng đảm bảo đúng tỷ lệ: 10 câu `BIET`, 15 câu `HIEU`, 25 câu `VAN_DUNG` 
+  và giữ nguyên cấu trúc vị trí (39 câu đơn, 2 cụm câu nhóm 6 câu, 5 câu trả lời ngắn).
