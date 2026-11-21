@@ -7,6 +7,7 @@ import { User, Upload, BookOpen, Clock, FileText } from 'lucide-react';
 
 interface Candidate {
   fullName?: string;
+  username?: string;
   sbd?: string;
   email?: string;
 }
@@ -101,12 +102,29 @@ export default function HomePage() {
             <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
               Lịch sử làm đề
             </Link>
-            <Link
-              href={candidate ? '/profile' : '/login'}
-              className="text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-2"
-            >
-              [{candidate?.fullName || candidate?.sbd || 'TÊN TÀI KHOẢN'}]
-            </Link>
+            {candidate ? (
+              <Link
+                href="/profile"
+                className="text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-2 transition"
+              >
+                [{candidate.fullName || candidate.sbd || candidate.username || 'TÀI KHOẢN'}]
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2 sm:gap-3 pl-2">
+                <Link
+                  href="/login"
+                  className="text-amber-300 hover:text-amber-200 font-semibold text-xs sm:text-sm transition"
+                >
+                  Đăng nhập
+                </Link>
+                <Link
+                  href="/signup"
+                  className="px-3.5 py-1.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
+                >
+                  Đăng ký
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 

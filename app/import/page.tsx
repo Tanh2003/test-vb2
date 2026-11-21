@@ -23,14 +23,14 @@ function UploadContent() {
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [candidateName, setCandidateName] = useState('TÊN TÀI KHOẢN');
+  const [candidate, setCandidate] = useState<{ fullName?: string; sbd?: string; username?: string } | null>(null);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem('candidate_info');
       if (stored) {
         const u = JSON.parse(stored);
-        setCandidateName(u.fullName || u.sbd || 'TÊN TÀI KHOẢN');
+        setCandidate(u);
       }
     } catch (e) {
       console.error(e);
@@ -161,9 +161,26 @@ function UploadContent() {
             <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
               Lịch sử làm đề
             </Link>
-            <Link href="/profile" className="text-amber-300 font-semibold uppercase text-xs sm:text-sm pl-2">
-              [{candidateName}]
-            </Link>
+            {candidate ? (
+              <Link href="/profile" className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs sm:text-sm pl-2 transition">
+                [{candidate.fullName || candidate.sbd || candidate.username || 'TÀI KHOẢN'}]
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2 sm:gap-3 pl-2">
+                <Link
+                  href="/login"
+                  className="text-amber-300 hover:text-amber-200 font-semibold text-xs sm:text-sm transition"
+                >
+                  Đăng nhập
+                </Link>
+                <Link
+                  href="/signup"
+                  className="px-3.5 py-1.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
+                >
+                  Đăng ký
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </header>
