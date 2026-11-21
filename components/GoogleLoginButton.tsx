@@ -6,7 +6,17 @@ import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 
-export default function GoogleLoginButton() {
+interface GoogleLoginButtonProps {
+  className?: string;
+  variant?: 'light' | 'dark';
+  redirectTo?: string;
+}
+
+export default function GoogleLoginButton({
+  className = '',
+  variant = 'light',
+  redirectTo = '/',
+}: GoogleLoginButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,13 +26,9 @@ export default function GoogleLoginButton() {
       setIsLoading(true);
       setError(null);
 
-      // 1. Popup đăng nhập Google
       const result = await signInWithPopup(auth, googleProvider);
-
-      // 2. Lấy Firebase ID Token
       const idToken = await result.user.getIdToken();
 
-      // 3. Gửi idToken lên server tạo Session Cookie
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -36,7 +42,6 @@ export default function GoogleLoginButton() {
         throw new Error(errorData.error || 'Đăng nhập máy chủ thất bại.');
       }
 
-      // Lưu thông tin thí sinh vào localStorage để các màn thi truy cập nhanh
       localStorage.setItem(
         'candidate_info',
         JSON.stringify({
@@ -47,12 +52,10 @@ export default function GoogleLoginButton() {
         })
       );
 
-      // 4. Điều hướng tới Dashboard và làm mới phiên
-      router.push('/dashboard');
+      router.push(redirectTo);
       router.refresh();
     } catch (err: any) {
       console.error('Google Sign-In Error:', err);
-      // Bỏ qua lỗi popup bị người dùng tắt giữa chừng
       if (err?.code !== 'auth/popup-closed-by-user') {
         setError(err?.message || 'Có lỗi xảy ra khi đăng nhập bằng Google.');
       }
@@ -61,18 +64,23 @@ export default function GoogleLoginButton() {
     }
   };
 
+  const baseStyle =
+    variant === 'light'
+      ? 'bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 shadow-sm'
+      : 'bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200';
+
   return (
     <div className="w-full">
       <button
         type="button"
         onClick={handleGoogleLogin}
         disabled={isLoading}
-        className="w-full py-2.5 px-4 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-slate-200 flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        className={`w-full py-2.5 sm:py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${baseStyle} ${className}`}
       >
         {isLoading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-            <span>Đang xử lý đăng nhập...</span>
+            <span>Đang xử lý...</span>
           </>
         ) : (
           <>
@@ -94,13 +102,13 @@ export default function GoogleLoginButton() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>Đăng nhập với Google</span>
+            <span>Đăng nhập bằng Google</span>
           </>
         )}
       </button>
 
       {error && (
-        <p className="mt-2 text-xs text-red-400 text-center">{error}</p>
+        <p className="mt-2 text-xs text-red-500 text-center">{error}</p>
       )}
     </div>
   );

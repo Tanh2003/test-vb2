@@ -1,173 +1,288 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  GraduationCap,
-  PlayCircle,
-  History,
-  BookOpen,
-  ArrowRight,
-  ShieldCheck,
-  Clock,
-  Award,
-  Sparkles,
-  LogIn,
-} from 'lucide-react';
+import Link from 'next/link';
+import { User, Upload, BookOpen, Clock, FileText } from 'lucide-react';
+
+interface Candidate {
+  fullName?: string;
+  sbd?: string;
+  email?: string;
+}
 
 export default function HomePage() {
   const router = useRouter();
+  const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [activeCaTab, setActiveCaTab] = useState<'ALL' | 'CA1' | 'CA2' | 'CA3' | 'CA4'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('candidate_info');
+      if (stored) {
+        setCandidate(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const freeExams = [
+    {
+      id: 'CA1-FREE-01',
+      title: '[TÊN ĐỀ MIỄN PHÍ 1]',
+      meta: 'CA1 · 50 câu · 150 phút',
+      tag: 'Miễn phí',
+    },
+    {
+      id: 'CA1-FREE-02',
+      title: '[TÊN ĐỀ MIỄN PHÍ 2]',
+      meta: 'CA1 · 50 câu · 150 phút',
+      tag: 'Miễn phí',
+    },
+    {
+      id: 'CA1-FREE-03',
+      title: '[TÊN ĐỀ MIỄN PHÍ 3]',
+      meta: 'CA1 · 50 câu · 150 phút',
+      tag: 'Miễn phí',
+    },
+  ];
+
+  const caCategories = [
+    { code: 'CA1', desc: '[CÁCH UPLOAD CA1]', count: 0 },
+    { code: 'CA2', desc: '[CÁCH UPLOAD CA2]', count: 0 },
+    { code: 'CA3', desc: '[CÁCH UPLOAD CA3]', count: 0 },
+    { code: 'CA4', desc: '[CÁCH UPLOAD CA4]', count: 0 },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* Background Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-72 bg-gradient-to-b from-red-600/10 via-blue-600/5 to-transparent blur-3xl pointer-events-none" />
-
-      {/* Navigation Header */}
-      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 shadow-sm shadow-red-500/20">
-              <ShieldCheck className="w-6 h-6" />
+    <div className="min-h-screen bg-[#f7f8f7] text-slate-800 font-sans flex flex-col justify-between">
+      {/* 1. HEADER & HERO SECTION (XANH RÊU CAND) */}
+      <div className="bg-[#0f2d22] text-white">
+        {/* Top Navbar */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between border-b border-emerald-900/60">
+          {/* Logo & Brand */}
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 relative flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 36 42" className="w-full h-full drop-shadow">
+                <path
+                  d="M18 1L33 6.5V20C33 30 26 38 18 41C10 38 3 30 3 20V6.5L18 1Z"
+                  fill="#C1121F"
+                  stroke="#FBBF24"
+                  strokeWidth="2.5"
+                />
+                <polygon
+                  points="18,10 20.8,16.5 27.5,17 22.5,21.5 24,28 18,24.5 12,28 13.5,21.5 8.5,17 15.2,16.5"
+                  fill="#FBBF24"
+                />
+              </svg>
             </div>
             <div>
-              <span className="text-xs font-semibold tracking-wider text-red-400 uppercase">
-                Hội đồng Tuyển sinh
-              </span>
-              <h2 className="text-sm font-bold text-slate-100">Cổng Luyện Thi VB2 CAND</h2>
+              <div className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-amber-400 leading-tight">
+                THI ONLINE VB2
+              </div>
+              <div className="text-[11px] text-slate-200/90 font-medium">
+                Văn bằng 2 Công an
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <Sparkles className="w-3.5 h-3.5" />
-              Phiên bản 2026
-            </span>
-            <button
-              onClick={() => router.push('/login')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/30 transition active:scale-[0.98] cursor-pointer"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Đăng ký</span>
-            </button>
-            <button
-              onClick={() => router.push('/login')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/30 transition active:scale-[0.98] cursor-pointer"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Đăng nhập</span>
-            </button>
-          </div>
-        </div>
-      </header>
+          </Link>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8 sm:py-12 flex flex-col justify-center">
-        {/* Hero Section */}
-        <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-14">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold uppercase tracking-wider mb-4">
-            <GraduationCap className="w-4 h-4" />
-            Khóa Thi Tuyển Sinh Đào Tạo Trực Tuyến
-          </div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white uppercase leading-snug">
-            Luyện Thi Văn Bằng 2 CAND - Năm 2026
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-300 to-amber-500 mt-1">
-              (Mã Đề CA1: Toán Cao Cấp & Tự Luận)
-            </span>
-          </h1>
-          <p className="mt-4 text-sm sm:text-base text-slate-400 leading-relaxed">
-            &ldquo;Bản lĩnh &bull; Trí tuệ &bull; Kỷ cương &bull; Vì an ninh Tổ quốc&rdquo;
-            <br />
-            Chúc các đồng chí ôn luyện vững vàng, nắm chắc kiến thức và tự tin đạt kết quả cao nhất!
-          </p>
-
-          {/* Quick Info Tags */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mt-6 text-xs text-slate-300">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
-              <Clock className="w-4 h-4 text-amber-400" />
-              <span>Thời gian: <strong>150 phút</strong></span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
-              <Award className="w-4 h-4 text-emerald-400" />
-              <span>Thang điểm: <strong>100 điểm</strong> (30đ TL + 70đ TN)</span>
-            </div>
+          {/* Nav links */}
+          <div className="flex items-center gap-4 sm:gap-8 text-xs sm:text-sm font-medium">
+            <Link href="/" className="text-white font-semibold underline underline-offset-4 decoration-amber-400">
+              Thư viện đề
+            </Link>
+            <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
+              Upload đề
+            </Link>
+            <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
+              Lịch sử làm đề
+            </Link>
+            <Link
+              href={candidate ? '/profile' : '/login'}
+              className="text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-2"
+            >
+              [{candidate?.fullName || candidate?.sbd || 'TÊN TÀI KHOẢN'}]
+            </Link>
           </div>
         </div>
 
-        {/* Feature Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Bắt đầu Luyện đề */}
-          <div className="relative group bg-slate-900/90 border-2 border-red-500/40 hover:border-red-500 rounded-2xl p-6 flex flex-col justify-between transition-all duration-300 shadow-xl shadow-red-950/30 hover:-translate-y-1">
-            <div className="space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-red-600/20 text-red-500 flex items-center justify-center border border-red-500/30">
-                <PlayCircle className="w-7 h-7" />
-              </div>
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-red-400">Trọng tâm</span>
-                <h3 className="text-xl font-bold text-white mt-0.5">Thi thử & Luyện đề CA1</h3>
-              </div>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Làm bài thi đánh giá năng lực 150 phút gồm Phần Tự luận (30đ) và 50 câu Trắc nghiệm Toán cao cấp (70đ).
-              </p>
+        {/* Hero Banner */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-1">
+              VĂN BẰNG 2 · CÔNG AN
             </div>
-            <button
-              onClick={() => router.push('/select-exam')}
-              className="mt-6 w-full py-3 px-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 font-bold rounded-xl text-white shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 transition active:scale-[0.98] cursor-pointer"
-            >
-              <span>Vào Phòng Thi</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">
+              Thư viện đề của bạn
+            </h1>
+            <p className="text-xs sm:text-sm text-emerald-100/80">
+              Làm thử bộ đề miễn phí hoặc tải đề PDF của bạn lên để làm online.
+            </p>
           </div>
-
-          {/* Card 2: Lịch sử & Kết quả */}
-          <div className="group bg-slate-900/80 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 flex flex-col justify-between transition-all duration-300 shadow-lg hover:-translate-y-1">
-            <div className="space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
-                <History className="w-7 h-7" />
-              </div>
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Theo dõi tiến độ</span>
-                <h3 className="text-xl font-bold text-white mt-0.5">Lịch sử Luyện đề</h3>
-              </div>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Xem lại điểm số các bài thi thử đã làm, đối chiếu đáp án chi tiết và điểm xét tuyển quy đổi.
-              </p>
-            </div>
-            <button
-              onClick={() => router.push('/result')}
-              className="mt-6 w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition active:scale-[0.98] cursor-pointer"
-            >
-              <span>Xem Lịch Sử</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Card 3: Ôn tập & Tra cứu */}
-          <div className="group bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-6 flex flex-col justify-between transition-all duration-300 shadow-lg hover:-translate-y-1">
-            <div className="space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-                <BookOpen className="w-7 h-7" />
-              </div>
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Tài liệu học tập</span>
-                <h3 className="text-xl font-bold text-white mt-0.5">Ngân hàng Ôn tập</h3>
-              </div>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Xem nhanh hệ thống câu hỏi, công thức toán học LaTeX và đáp án.
-              </p>
-            </div>
+          <div>
             <button
               onClick={() => router.push('/import')}
-              className="mt-6 w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition active:scale-[0.98] cursor-pointer"
+              className="px-6 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] font-bold text-white text-sm shadow-md shadow-red-950/30 transition active:scale-[0.98] cursor-pointer"
             >
-              <span>Vào Kho Ôn Tập</span>
-              <ArrowRight className="w-4 h-4" />
+              Upload đề
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. BODY CONTENT (BACKGROUND SÁNG) */}
+      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8 flex-1">
+        {/* Notice Banner */}
+        <div className="bg-[#fffbeb] border border-amber-200/90 rounded-2xl p-4 text-xs sm:text-sm text-amber-900 font-medium">
+          Bạn còn 2/2 lượt tải đề miễn phí. Từ lần thứ 3, phí [PHÍ] đ cho mỗi đề.
+        </div>
+
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-6">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Tìm bộ đề
+            </label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22] transition"
+            />
+          </div>
+          <div className="md:col-span-3">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Nguồn đề
+            </label>
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22] transition"
+            >
+              <option value="ALL">Tất cả</option>
+              <option value="FREE">Bộ đề miễn phí</option>
+              <option value="USER">Đề của bạn</option>
+            </select>
+          </div>
+          <div className="md:col-span-3">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Trạng thái
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22] transition"
+            >
+              <option value="ALL">Tất cả</option>
+              <option value="TODO">Chưa làm</option>
+              <option value="DONE">Đã hoàn thành</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Section 1: Bộ đề miễn phí */}
+        <div>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4">
+            Bộ đề miễn phí
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {freeExams.map((exam) => (
+              <div
+                key={exam.id}
+                className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="text-base font-bold text-slate-900 leading-snug">
+                      {exam.title}
+                    </h3>
+                    <span className="shrink-0 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      {exam.tag}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-6">{exam.meta}</p>
+                </div>
+                <button
+                  onClick={() => router.push('/select-exam')}
+                  className="w-full py-2.5 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white font-semibold text-sm transition active:scale-[0.98] cursor-pointer"
+                >
+                  Làm bài
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 2: Đề của bạn */}
+        <div className="space-y-4">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+            Đề của bạn
+          </h2>
+
+          {/* Ca Tabs Filter */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+            {(['ALL', 'CA1', 'CA2', 'CA3', 'CA4'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveCaTab(tab)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                  activeCaTab === tab
+                    ? 'bg-[#0f2d22] text-white'
+                    : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {tab === 'ALL' ? 'Tất cả' : tab}
+              </button>
+            ))}
+          </div>
+
+          {/* Empty State Banner */}
+          <div className="bg-white rounded-2xl p-10 border border-slate-200/80 shadow-sm text-center">
+            <h3 className="text-base font-bold text-slate-800 mb-1">
+              Bạn chưa có đề nào
+            </h3>
+            <p className="text-xs text-slate-500">
+              Chọn ca bên dưới để upload đề PDF đầu tiên.
+            </p>
+          </div>
+
+          {/* 4 Ca Upload Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {caCategories.map((ca) => (
+              <div
+                key={ca.code}
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-base font-bold text-slate-900">
+                      {ca.code}
+                    </span>
+                    <span className="text-xs text-slate-400 font-medium">
+                      {ca.count} đề
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-5">{ca.desc}</p>
+                </div>
+                <button
+                  onClick={() => router.push(`/import?ca=${ca.code}`)}
+                  className="w-full py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-semibold text-xs sm:text-sm shadow-sm transition active:scale-[0.98] cursor-pointer"
+                >
+                  Upload đề {ca.code}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
-        Phần mềm Hỗ trợ Luyện thi Văn Bằng 2 CAND &bull; Mã Đề CA1 &bull; Năm 2026
+      {/* 3. FOOTER */}
+      <footer className="bg-[#0a2018] text-emerald-100/60 text-xs py-6 px-4 text-center mt-12 border-t border-emerald-950">
+        [THÔNG TIN LIÊN HỆ / HỖ TRỢ]
       </footer>
     </div>
   );

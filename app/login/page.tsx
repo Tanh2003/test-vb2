@@ -4,226 +4,186 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import GoogleLoginButton from '@/components/GoogleLoginButton';
-import {
-  ShieldCheck,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  Star,
-  PenTool,
-  MessageSquare,
-  Loader2,
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Vui lòng nhập đầy đủ thông tin đăng nhập.');
+    if (!account || !password) {
+      setError('Vui lòng nhập tên tài khoản hoặc Gmail và mật khẩu.');
       return;
     }
+
     setError('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      localStorage.setItem(
-        'candidate_info',
-        JSON.stringify({
-          sbd: email.includes('@') ? email.split('@')[0].toUpperCase() : email.toUpperCase(),
-          fullName: 'ĐỒNG CHÍ THÍ SINH',
-          email,
-          examCode: 'CA1',
-        })
-      );
+    try {
+      // 1. Gọi API xác thực trực tiếp từ Firebase (Firestore & Firebase Auth)
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account: account.trim(),
+          password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Đăng nhập không thành công.');
+      }
+
+      // 2. Lưu hồ sơ thí sinh lấy trực tiếp từ Firebase vào LocalStorage
+      localStorage.setItem('candidate_info', JSON.stringify(data.user));
+
+      // 3. Chuyển hướng về Trang chủ
+      router.push('/');
+      router.refresh();
+    } catch (err: any) {
+      setError(err?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.');
+    } finally {
       setIsLoading(false);
-      router.push('/select-exam');
-    }, 600);
+    }
   };
 
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
-      {/* Background Ambient Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-red-600/10 blur-[120px] pointer-events-none rounded-full" />
-
-      {/* Main Container Card */}
-      <div className="w-full max-w-4xl bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 relative z-10">
-        {/* Left Side: Branding & Features */}
-        <div className="bg-gradient-to-br from-red-950/40 via-slate-900 to-slate-950 p-8 sm:p-10 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800/80">
-          <div>
-            {/* Logo */}
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-12 h-12 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 shadow-lg shadow-red-600/20">
-                <ShieldCheck className="w-7 h-7" />
-              </div>
-              <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-red-400 block">
-                  Bộ Công An
-                </span>
-                <span className="text-sm font-extrabold text-white tracking-tight">
-                  VB2 CAND PORTAL
-                </span>
-              </div>
-            </div>
-
-            {/* Headline */}
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight mb-3">
-              Chinh phục ước mơ
-            </h2>
-            <p className="text-sm text-slate-400 leading-relaxed mb-8">
-              Hệ thống ôn luyện và thi thử trực tuyến tuyển sinh Văn bằng 2 CAND (Mã đề CA1, CA2...).
-            </p>
-
-            {/* Feature Bullets */}
-            <div className="space-y-4 text-xs sm:text-sm text-slate-300">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
-                  <Star className="w-4 h-4 fill-amber-400" />
-                </div>
-                <span>Lộ trình ôn luyện & sinh đề cá nhân hoá</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center shrink-0">
-                  <PenTool className="w-4 h-4" />
-                </div>
-                <span>Ngân hàng đề thi thử bám sát cấu trúc Bộ CA</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <MessageSquare className="w-4 h-4" />
-                </div>
-                <span>Trợ lý AI hỗ trợ giải chi tiết & chấm tự luận</span>
-              </div>
-            </div>
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 font-sans">
+      {/* Cột trái: Thương hiệu CAND & Thông điệp */}
+      <div className="bg-[#0f2d22] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden">
+        {/* Header Logo */}
+        <div className="flex items-center gap-3.5 z-10">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 relative flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 36 42" className="w-full h-full drop-shadow">
+              <path
+                d="M18 1L33 6.5V20C33 30 26 38 18 41C10 38 3 30 3 20V6.5L18 1Z"
+                fill="#C1121F"
+                stroke="#FBBF24"
+                strokeWidth="2.5"
+              />
+              <polygon
+                points="18,10 20.8,16.5 27.5,17 22.5,21.5 24,28 18,24.5 12,28 13.5,21.5 8.5,17 15.2,16.5"
+                fill="#FBBF24"
+              />
+            </svg>
           </div>
-
-          <div className="mt-8 pt-6 border-t border-slate-800/80 text-[11px] text-slate-500">
-            Bản quyền © 2026 Hội đồng Tuyển sinh Văn bằng 2 CAND
+          <div>
+            <div className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-amber-400 leading-tight">
+              THI ONLINE VB2
+            </div>
+            <div className="text-xs text-slate-200/90 font-medium">
+              Văn bằng 2 Công an
+            </div>
           </div>
         </div>
 
-        {/* Right Side: Login Form */}
-        <div className="p-8 sm:p-10 flex flex-col justify-between bg-slate-900/60">
-          <div>
-            {/* Form Header */}
-            <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold text-white tracking-tight">Đăng nhập</h1>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition font-medium"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Trang chủ</span>
-              </Link>
+        {/* Nội dung trung tâm */}
+        <div className="my-auto py-12 sm:py-16 max-w-lg z-10">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-[1.25] mb-5 tracking-tight">
+            Tải đề PDF của bạn lên, thi online theo từng ca
+          </h1>
+          <p className="text-sm sm:text-base text-emerald-100/80 font-normal">
+            Hai lượt tải đề đầu tiên miễn phí.
+          </p>
+        </div>
+
+        {/* Footer ca thi */}
+        <div className="text-xs sm:text-sm text-emerald-100/60 font-semibold tracking-widest z-10">
+          CA1 · CA2 · CA3 · CA4
+        </div>
+      </div>
+
+      {/* Cột phải: Form Đăng nhập dạng Card */}
+      <div className="bg-[#f7f8f7] flex items-center justify-center p-4 sm:p-8 lg:p-12">
+        <div className="w-full max-w-[430px] bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 p-8 sm:p-10">
+          {/* Tiêu đề */}
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0f2d22] mb-6">
+            Đăng nhập
+          </h2>
+
+          {/* Nút Đăng nhập bằng Google */}
+          <GoogleLoginButton variant="light" redirectTo="/" />
+
+          {/* Dòng phân cách */}
+          <div className="my-6 text-center text-xs sm:text-sm text-slate-500 font-normal">
+            hoặc đăng nhập bằng tài khoản
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600 font-medium">
+              {error}
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mb-6">
-              Chào mừng đồng chí quay lại! Tiếp tục lộ trình luyện thi của mình.
-            </p>
+          )}
 
-            {error && (
-              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400">
-                {error}
-              </div>
-            )}
+          {/* Form đăng nhập tài khoản */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
+                Tên tài khoản hoặc Gmail
+              </label>
+              <input
+                type="text"
+                required
+                value={account}
+                onChange={(e) => setAccount(e.target.value)}
+                className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-[#0f2d22] focus:ring-1 focus:ring-[#0f2d22] text-slate-800 text-sm transition"
+              />
+            </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email / Username */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Email / Số báo danh
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="text"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="email@example.com hoặc SBD"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition"
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Mật khẩu
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Nhập mật khẩu"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Forgot Password */}
-              <div className="flex justify-end">
+            <div>
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
+                Mật khẩu
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-[#0f2d22] focus:ring-1 focus:ring-[#0f2d22] text-slate-800 text-sm transition"
+              />
+              <div className="flex justify-end mt-2">
                 <button
                   type="button"
                   onClick={() => alert('Vui lòng liên hệ Hội đồng tuyển sinh để khôi phục mật khẩu.')}
-                  className="text-xs text-red-400 hover:text-red-300 transition font-medium"
+                  className="text-xs font-semibold text-[#0f2d22] hover:underline cursor-pointer"
                 >
                   Quên mật khẩu?
                 </button>
               </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 font-bold rounded-xl text-sm text-white shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Đăng nhập</span>}
-              </button>
-            </form>
-
-            {/* Divider */}
-            <div className="relative my-5 text-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-800" />
-              </div>
-              <span className="relative bg-slate-900 px-3 text-xs text-slate-500 uppercase tracking-wider">
-                hoặc
-              </span>
             </div>
 
-            {/* Google Login Button */}
-            <GoogleLoginButton />
-          </div>
-
-          {/* Footer Register Link */}
-          <div className="mt-6 text-center text-xs text-slate-400">
-            Bạn chưa có tài khoản?{' '}
+            {/* Nút Đăng nhập đỏ */}
             <button
-              type="button"
-              onClick={() => alert('Hệ thống tuyển sinh hiện đang mở đợt đăng ký theo kế hoạch của Bộ Công An.')}
-              className="text-red-400 hover:text-red-300 font-bold transition ml-1"
+              type="submit"
+              disabled={isLoading}
+              className="w-full mt-2 py-3 px-4 bg-[#c1121f] hover:bg-[#a50f1a] font-bold rounded-xl text-sm sm:text-base text-white shadow-md shadow-red-700/20 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
             >
-              Đăng ký ngay
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Đang xác thực...</span>
+                </span>
+              ) : (
+                'Đăng nhập'
+              )}
             </button>
+          </form>
+
+          {/* Link Đăng ký */}
+          <div className="mt-6 text-center text-xs sm:text-sm text-slate-600">
+            Chưa có tài khoản?{' '}
+            <Link
+              href="/signup"
+              className="font-bold text-[#0f2d22] hover:underline cursor-pointer"
+            >
+              Đăng ký
+            </Link>
           </div>
         </div>
       </div>
