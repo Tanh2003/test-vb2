@@ -13,6 +13,9 @@ import {
   RefreshCw,
   Plus,
   BookOpen,
+  FileText,
+  Cloud,
+  ExternalLink,
 } from 'lucide-react';
 import { PAPER_META, PaperCode } from '@/types/exam';
 
@@ -28,6 +31,8 @@ interface ExamItem {
   userId?: string;
   ownerName?: string;
   isPublic?: boolean;
+  pdfFileUrl?: string;
+  answerPdfFileUrl?: string;
 }
 
 interface CandidateInfo {
@@ -393,6 +398,25 @@ export default function SelectExamPage() {
                         <span className="font-semibold">{exam.totalQuestions || 50} Câu hỏi</span>
                       </div>
                     </div>
+
+                    {/* Liên kết file PDF trên Backblaze B2 nếu có */}
+                    {exam.pdfFileUrl && (
+                      <div className="pt-2 flex items-center justify-between text-[11px] text-emerald-800 bg-emerald-50/70 p-2 rounded-xl border border-emerald-100">
+                        <span className="flex items-center gap-1 font-semibold text-emerald-950">
+                          <Cloud className="w-3.5 h-3.5 text-emerald-700" /> File PDF gốc (B2)
+                        </span>
+                        <a
+                          href={exam.pdfFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-emerald-700 hover:text-emerald-900 underline flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Xem PDF</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   <button

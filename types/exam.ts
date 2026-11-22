@@ -167,6 +167,12 @@ export interface ExamDoc {
   durationMinutes: number;
   paperCodes?: PaperCode[];
   examCode?: PaperCode;
+  pdfFileUrl?: string;
+  pdfFileName?: string;
+  b2FileId?: string;
+  answerPdfFileUrl?: string;
+  answerPdfFileName?: string;
+  b2UploadedAt?: string;
   status?: ExamStatus;
   createdAt: string | Timestamp;
   updatedAt?: string | Timestamp;
@@ -182,6 +188,12 @@ export interface PaperDoc {
   ownerEmail?: string;
   subject: string;
   status: ExamStatus;
+  pdfFileUrl?: string;
+  pdfFileName?: string;
+  b2FileId?: string;
+  answerPdfFileUrl?: string;
+  answerPdfFileName?: string;
+  b2UploadedAt?: string;
   essay: { prompt: RichText; citation?: string; minWords: number; maxPoints: number; rubric?: RichText };
   groups: { id: string; fromNumber: number; toNumber: number; content: RichText }[];
   questions: Question[];

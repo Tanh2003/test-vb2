@@ -18,6 +18,8 @@ import {
   Clock,
   X,
   PlayCircle,
+  Cloud,
+  ExternalLink,
 } from 'lucide-react';
 import {
   ParsedExamPreview,
@@ -75,7 +77,14 @@ function UploadContent() {
   const [parsingStep, setParsingStep] = useState<string>('');
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingStep, setSavingStep] = useState<string>('');
   const [savedExamId, setSavedExamId] = useState<string | null>(null);
+  const [uploadedB2Files, setUploadedB2Files] = useState<{
+    examPdfUrl?: string;
+    examPdfName?: string;
+    answerPdfUrl?: string;
+    answerPdfName?: string;
+  } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
 
@@ -255,6 +264,7 @@ function UploadContent() {
 
     setIsSaving(true);
     setErrorMessage(null);
+    setSavingStep('Đang chuẩn bị lưu trữ đề thi...');
     try {
       const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
       const currentUserName = candidate?.fullName || candidate?.username || candidate?.sbd || '';
@@ -262,6 +272,67 @@ function UploadContent() {
 
       const effectiveCa = (selectedCa || (parsedData.paperCode as PaperCode) || 'CA1') as PaperCode;
       const examId = savedExamId || `${effectiveCa.toLowerCase()}_${Date.now()}`;
+
+      // 1. UPLOAD FILE PDF LÊN ĐÁM MÂY BACKBLAZE B2
+      let examPdfUrl = parsedData.pdfFileUrl || '';
+      let examPdfFileName = parsedData.pdfFileName || '';
+      let examB2FileId = parsedData.b2FileId || '';
+
+      if (examFile) {
+        try {
+          setSavingStep('Đang tải file PDF đề thi lên lưu trữ đám mây Backblaze B2...');
+          const fd = new FormData();
+          fd.append('file', examFile);
+          fd.append('folder', 'exams');
+          fd.append('examId', examId);
+          fd.append('paperCode', effectiveCa);
+
+          const upRes = await fetch('/api/upload-b2', {
+            method: 'POST',
+            body: fd,
+          });
+
+          if (upRes.ok) {
+            const upData = await upRes.json();
+            examPdfUrl = upData.proxyUrl || upData.directUrl || upData.authorizedUrl;
+            examPdfFileName = examFile.name;
+            examB2FileId = upData.fileId;
+          } else {
+            console.warn('Không thể upload examFile lên B2, tiếp tục lưu thông tin đề');
+          }
+        } catch (b2Err) {
+          console.error('Lỗi upload examFile lên B2:', b2Err);
+        }
+      }
+
+      let answerPdfUrl = parsedData.answerPdfFileUrl || '';
+      let answerPdfFileName = parsedData.answerPdfFileName || '';
+
+      if (answerFile) {
+        try {
+          setSavingStep('Đang tải file PDF đáp án lên lưu trữ đám mây Backblaze B2...');
+          const fd = new FormData();
+          fd.append('file', answerFile);
+          fd.append('folder', 'answers');
+          fd.append('examId', examId);
+          fd.append('paperCode', effectiveCa);
+
+          const upRes = await fetch('/api/upload-b2', {
+            method: 'POST',
+            body: fd,
+          });
+
+          if (upRes.ok) {
+            const upData = await upRes.json();
+            answerPdfUrl = upData.proxyUrl || upData.directUrl || upData.authorizedUrl;
+            answerPdfFileName = answerFile.name;
+          }
+        } catch (b2Err) {
+          console.error('Lỗi upload answerFile lên B2:', b2Err);
+        }
+      }
+
+      setSavingStep('Đang lưu dữ liệu đề thi vào Firebase Realtime Database...');
       const updatedQuestions = parsedData.questions || [];
 
       // Đồng bộ đáp án đúng sang các cấu trúc tương thích ngược
@@ -298,6 +369,12 @@ function UploadContent() {
         ownerName: currentUserName || parsedData.ownerName || '',
         ownerEmail: currentUserEmail || parsedData.ownerEmail || '',
         isPublic,
+        pdfFileUrl: examPdfUrl,
+        pdfFileName: examPdfFileName,
+        b2FileId: examB2FileId,
+        answerPdfFileUrl: answerPdfUrl,
+        answerPdfFileName: answerPdfFileName,
+        b2UploadedAt: examPdfUrl ? new Date().toISOString() : undefined,
         questions: updatedQuestions,
         singleChoices,
         groupQuestions,
@@ -314,6 +391,13 @@ function UploadContent() {
         throw new Error(`Lỗi lưu vào CSDL Firebase (Status ${res.status})`);
       }
 
+      setUploadedB2Files({
+        examPdfUrl,
+        examPdfName: examPdfFileName,
+        answerPdfUrl,
+        answerPdfName: answerPdfFileName,
+      });
+
       localStorage.setItem(`parsed_exam_${effectiveCa}`, JSON.stringify(payload));
       localStorage.setItem(`exam_current_${examId}`, JSON.stringify(payload));
       saveToUserUploadedList(payload);
@@ -324,6 +408,7 @@ function UploadContent() {
       setErrorMessage(`Lỗi lưu đề thi: ${msg}`);
     } finally {
       setIsSaving(false);
+      setSavingStep('');
     }
   };
 
@@ -907,7 +992,7 @@ function UploadContent() {
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Đang lưu vào Firebase...</span>
+                      <span>{savingStep || 'Đang lưu đề & Upload B2...'}</span>
                     </>
                   ) : missingAnswersCount > 0 ? (
                     <>
@@ -935,8 +1020,20 @@ function UploadContent() {
               </div>
             </div>
 
+            {/* Trạng thái đang lưu & upload Backblaze B2 */}
+            {isSaving && savingStep && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl text-blue-900 text-xs sm:text-sm flex items-center gap-3 shadow-xs animate-pulse">
+                <Loader2 className="w-5 h-5 text-blue-600 animate-spin shrink-0" />
+                <div className="flex-1">
+                  <span className="font-bold block text-blue-950">Đang thực hiện lưu trữ đám mây:</span>
+                  <span className="text-blue-800 font-medium">{savingStep}</span>
+                </div>
+                <Cloud className="w-5 h-5 text-blue-500 shrink-0" />
+              </div>
+            )}
+
             {/* Thông báo tình trạng đáp án trước khi lưu */}
-            {!savedExamId && missingAnswersCount > 0 && (
+            {!savedExamId && !isSaving && missingAnswersCount > 0 && (
               <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-sm flex items-start gap-3 shadow-xs">
                 <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
@@ -953,12 +1050,12 @@ function UploadContent() {
               </div>
             )}
 
-            {!savedExamId && missingAnswersCount === 0 && (
+            {!savedExamId && !isSaving && missingAnswersCount === 0 && (
               <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-900 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                   <span className="text-xs sm:text-sm font-medium">
-                    Đã hoàn thành 100% đáp án cho toàn bộ {parsedData.questions?.length || 50} câu hỏi. Bạn hãy bấm <strong>"Lưu Ngân hàng Đề"</strong> để lưu chính thức vào CSDL Firebase.
+                    Đã hoàn thành 100% đáp án cho toàn bộ {parsedData.questions?.length || 50} câu hỏi. Khi bấm <strong>"Lưu Ngân hàng Đề"</strong>, hệ thống sẽ tự động tải file PDF của bạn lên đám mây <strong>Backblaze B2</strong> và lưu đề vào CSDL Firebase.
                   </span>
                 </div>
                 <button
@@ -973,24 +1070,67 @@ function UploadContent() {
             )}
 
             {savedExamId && (
-              <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-900 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-2.5 font-medium">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>
-                    Đề thi đã được lưu thành công vào CSDL Firebase với mã <strong>{savedExamId}</strong> (gắn với ID tài khoản:{' '}
-                    <strong className="font-mono text-emerald-950">
-                      {candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || 'Tạm thời'}
-                    </strong>
-                    ). Đề thi này được bảo mật và <strong>chỉ hiển thị riêng cho tài khoản của bạn</strong>!
-                  </span>
+              <div className="p-5 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-emerald-900 text-sm space-y-3 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 font-medium">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+                    <div>
+                      <span className="font-extrabold text-emerald-950 text-base block">
+                        Đề thi & Tệp PDF đã được lưu trữ thành công!
+                      </span>
+                      <span className="text-xs text-emerald-800">
+                        Mã đề: <strong>{savedExamId}</strong> &bull; Gắn với ID tài khoản:{' '}
+                        <strong className="font-mono text-emerald-950">
+                          {candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || 'Tạm thời'}
+                        </strong>
+                        {' '}&bull; Quyền: <strong>Chỉ tài khoản của bạn xem được</strong>
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/select-exam')}
+                    className="text-xs font-bold text-white bg-emerald-800 hover:bg-emerald-900 px-4 py-2 rounded-xl shrink-0 cursor-pointer transition shadow-xs"
+                  >
+                    Vào Ngân hàng đề thi &rarr;
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => router.push('/select-exam')}
-                  className="text-xs font-bold text-emerald-800 underline hover:text-emerald-950 shrink-0 cursor-pointer"
-                >
-                  Xem trong danh sách đề thi &rarr;
-                </button>
+
+                {/* Khối hiển thị liên kết lưu trữ Backblaze B2 */}
+                {(uploadedB2Files?.examPdfUrl || parsedData.pdfFileUrl) && (
+                  <div className="pt-3 border-t border-emerald-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-emerald-900">
+                      <Cloud className="w-4 h-4 text-emerald-700" />
+                      <span>
+                        Đã tải và lưu trữ tệp an toàn trên <strong>Backblaze B2</strong> (Bucket: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono font-bold text-emerald-900">file-vb2</code>)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {uploadedB2Files?.examPdfUrl && (
+                        <a
+                          href={uploadedB2Files.examPdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-emerald-800 hover:text-emerald-950 underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Xem PDF Đề thi gốc trên B2</span>
+                        </a>
+                      )}
+                      {uploadedB2Files?.answerPdfUrl && (
+                        <a
+                          href={uploadedB2Files.answerPdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-blue-800 hover:text-blue-950 underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Xem PDF Đáp án trên B2</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

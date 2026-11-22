@@ -70,6 +70,12 @@ export interface ParsedData {
   questions?: PreviewQuestion[];
   validationErrors?: string[];
   warnings?: string[];
+  pdfFileUrl?: string;
+  pdfFileName?: string;
+  b2FileId?: string;
+  answerPdfFileUrl?: string;
+  answerPdfFileName?: string;
+  b2UploadedAt?: string;
   // Backward compatibility fields
   singleChoices?: SingleChoiceQuestion[];
   groupQuestions?: GroupQuestion[];
