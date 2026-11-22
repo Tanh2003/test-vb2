@@ -58,16 +58,15 @@ function UploadContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const answerFileInputRef = useRef<HTMLInputElement>(null);
 
-  const initialCa = (searchParams.get('ca')?.toUpperCase() as PaperCode) || 'CA1';
-  const [selectedCa, setSelectedCa] = useState<PaperCode>(
-    ['CA1', 'CA2', 'CA3', 'CA4'].includes(initialCa) ? initialCa : 'CA1'
-  );
+  const queryCa = (searchParams.get('ca')?.toUpperCase() as PaperCode) || '';
+  const initialCa = ['CA1', 'CA2', 'CA3', 'CA4'].includes(queryCa) ? queryCa : null;
+  const [selectedCa, setSelectedCa] = useState<PaperCode | null>(initialCa);
 
   const [examFile, setExamFile] = useState<File | null>(null);
   const [answerFile, setAnswerFile] = useState<File | null>(null);
 
   const [examTitle, setExamTitle] = useState(
-    `Đề thi ${initialCa} - ${PAPER_META[initialCa]?.subject || ''} Bộ Công An 2026`
+    initialCa ? `Đề thi ${initialCa} - ${PAPER_META[initialCa]?.subject || ''} Bộ Công An 2026` : ''
   );
   const [examDuration, setExamDuration] = useState('150');
   const [isPublic, setIsPublic] = useState(false);
@@ -99,12 +98,37 @@ function UploadContent() {
     setErrorMessage(null);
   };
 
+  // Tự động kiểm tra nếu tên file có chứa mã đề khác với mã đang chọn
+  const checkMismatchedCa = (file: File, currentCa: PaperCode | null) => {
+    const nameUpper = file.name.toUpperCase();
+    const detected = (['CA1', 'CA2', 'CA3', 'CA4'] as const).find((c) =>
+      nameUpper.includes(c)
+    );
+    if (detected) {
+      if (!currentCa) {
+        handleSelectCa(detected);
+      } else if (detected !== currentCa) {
+        const confirmSwitch = confirm(
+          `Bạn đang chọn mã đề "${currentCa}" (${PAPER_META[currentCa]?.subject || ''}) nhưng tệp tải lên là "${file.name}" (chứa mã đề ${detected} - ${PAPER_META[detected]?.subject || ''}).\n\nBạn có muốn tự động chuyển sang mã đề ${detected} không?`
+        );
+        if (confirmSwitch) {
+          handleSelectCa(detected);
+        }
+      }
+    }
+  };
+
   // Drag & drop handlers for Exam PDF
   const handleExamDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    if (!selectedCa) {
+      alert('Vui lòng bấm chọn loại đề thi (CA1, CA2, CA3 hoặc CA4) ở Bước 1 trước khi tải file!');
+      return;
+    }
     if (e.dataTransfer.files?.[0]) {
       const file = e.dataTransfer.files[0];
       if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        checkMismatchedCa(file, selectedCa);
         setExamFile(file);
         setErrorMessage(null);
       } else {
@@ -116,6 +140,10 @@ function UploadContent() {
   // Drag & drop handlers for Answer PDF
   const handleAnswerDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    if (!selectedCa) {
+      alert('Vui lòng bấm chọn loại đề thi (CA1, CA2, CA3 hoặc CA4) ở Bước 1 trước khi tải file đáp án!');
+      return;
+    }
     if (e.dataTransfer.files?.[0]) {
       const file = e.dataTransfer.files[0];
       if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
@@ -128,6 +156,10 @@ function UploadContent() {
 
   // Submit and call Gemini extraction API
   const handleSubmit = async () => {
+    if (!selectedCa) {
+      alert('Vui lòng chọn loại đề thi (CA1, CA2, CA3 hoặc CA4) ở Bước 1 trước khi bóc tách đề!');
+      return;
+    }
     if (!examFile) {
       alert('Vui lòng chọn hoặc kéo thả file đề thi PDF!');
       return;
@@ -228,7 +260,8 @@ function UploadContent() {
       const currentUserName = candidate?.fullName || candidate?.username || candidate?.sbd || '';
       const currentUserEmail = candidate?.email || '';
 
-      const examId = savedExamId || `${selectedCa.toLowerCase()}_${Date.now()}`;
+      const effectiveCa = (selectedCa || (parsedData.paperCode as PaperCode) || 'CA1') as PaperCode;
+      const examId = savedExamId || `${effectiveCa.toLowerCase()}_${Date.now()}`;
       const updatedQuestions = parsedData.questions || [];
 
       // Đồng bộ đáp án đúng sang các cấu trúc tương thích ngược
@@ -254,10 +287,10 @@ function UploadContent() {
       const payload = {
         ...parsedData,
         id: examId,
-        paperCode: selectedCa,
-        examCode: selectedCa,
-        subject: PAPER_META[selectedCa]?.subject || '',
-        title: examTitle || parsedData.examTitle || `Đề thi ${selectedCa}`,
+        paperCode: effectiveCa,
+        examCode: effectiveCa,
+        subject: PAPER_META[effectiveCa]?.subject || '',
+        title: examTitle || parsedData.examTitle || `Đề thi ${effectiveCa}`,
         duration: parseInt(examDuration, 10) || 150,
         durationMinutes: parseInt(examDuration, 10) || 150,
         ownerId: currentUserId || parsedData.ownerId || 'anonymous',
@@ -281,7 +314,7 @@ function UploadContent() {
         throw new Error(`Lỗi lưu vào CSDL Firebase (Status ${res.status})`);
       }
 
-      localStorage.setItem(`parsed_exam_${selectedCa}`, JSON.stringify(payload));
+      localStorage.setItem(`parsed_exam_${effectiveCa}`, JSON.stringify(payload));
       localStorage.setItem(`exam_current_${examId}`, JSON.stringify(payload));
       saveToUserUploadedList(payload);
       setSavedExamId(examId);
@@ -294,7 +327,7 @@ function UploadContent() {
     }
   };
 
-  const meta = PAPER_META[selectedCa];
+  const meta = selectedCa ? PAPER_META[selectedCa] : null;
 
   return (
     <div className="min-h-screen bg-[#f7f8f7] text-slate-800 font-sans flex flex-col justify-between">
@@ -466,9 +499,25 @@ function UploadContent() {
 
         {/* KHỐI 1: CHỌN MÃ ĐỀ (4 CARD CHUYÊN BIỆT) */}
         <div className="space-y-3">
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-            1. Chọn loại đề thi cần Upload:
-          </label>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+              1. Chọn loại đề thi cần Upload (Bắt buộc):
+            </label>
+            {!selectedCa ? (
+              <span className="text-xs font-black px-3 py-1 rounded-full bg-red-100 text-red-700 border border-red-300 animate-pulse flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>Bắt buộc: Hãy bấm chọn 1 mã đề bên dưới trước khi tải file</span>
+              </span>
+            ) : (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>
+                  Đang chọn mã đề: <strong>{selectedCa}</strong> ({meta?.subject})
+                </span>
+              </span>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {(['CA1', 'CA2', 'CA3', 'CA4'] as const).map((ca) => {
               const info = PAPER_META[ca];
@@ -477,10 +526,10 @@ function UploadContent() {
                 <div
                   key={ca}
                   onClick={() => handleSelectCa(ca)}
-                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between select-none ${
                     isSelected
-                      ? 'border-[#0f2d22] bg-emerald-50/70 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
+                      ? 'border-[#0f2d22] bg-emerald-50 ring-2 ring-emerald-500/40 shadow-md'
+                      : 'border-slate-200 bg-white hover:border-emerald-500 hover:shadow-xs'
                   }`}
                 >
                   <div className="space-y-1.5">
@@ -488,17 +537,23 @@ function UploadContent() {
                       <span
                         className={`text-sm font-extrabold px-2.5 py-0.5 rounded-lg ${
                           isSelected
-                            ? 'bg-[#0f2d22] text-white'
+                            ? 'bg-[#0f2d22] text-amber-300'
                             : 'bg-slate-100 text-slate-700'
                         }`}
                       >
                         {ca}
                       </span>
-                      <span className="text-[11px] font-bold text-slate-500">
-                        {info.expectedQuestions} câu
-                      </span>
+                      {isSelected ? (
+                        <span className="text-[10px] font-black uppercase text-emerald-900 bg-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-700" /> Đang chọn
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-slate-500">
+                          {info.expectedQuestions} câu
+                        </span>
+                      )}
                     </div>
-                    <h3 className="font-bold text-sm text-slate-900 leading-tight">
+                    <h3 className="font-extrabold text-sm text-slate-900 leading-tight">
                       {info.subject}
                     </h3>
                     <p className="text-[11px] text-slate-500 leading-relaxed">
@@ -520,6 +575,15 @@ function UploadContent() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Cột trái: Vùng Upload 2 file (Đề thi + Đáp án) & Form cấu hình */}
           <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6">
+            {!selectedCa && (
+              <div className="p-4 bg-amber-50 border-2 border-dashed border-amber-300 rounded-2xl text-amber-900 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span className="text-xs sm:text-sm font-bold">
+                  Khu vực tải file bị khóa. Vui lòng bấm chọn loại đề thi (CA1, CA2, CA3 hoặc CA4) ở Bước 1 trước khi tải file PDF lên!
+                </span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Dropzone 1: File PDF Đề thi chính thức (Bắt buộc) */}
               <div className="space-y-1.5">
@@ -540,18 +604,33 @@ function UploadContent() {
                 <div
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={handleExamDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition cursor-pointer min-h-[170px] flex flex-col justify-center items-center ${
-                    examFile
-                      ? 'border-emerald-500 bg-emerald-50/50'
-                      : 'border-slate-300 bg-slate-50/50 hover:bg-slate-50'
+                  onClick={() => {
+                    if (!selectedCa) {
+                      alert('Vui lòng bấm chọn loại đề thi (CA1, CA2, CA3 hoặc CA4) ở Bước 1 ở trên trước khi chọn file tải lên!');
+                      return;
+                    }
+                    fileInputRef.current?.click();
+                  }}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition min-h-[170px] flex flex-col justify-center items-center ${
+                    !selectedCa
+                      ? 'border-slate-200 bg-slate-100/70 cursor-not-allowed opacity-75'
+                      : examFile
+                      ? 'border-emerald-500 bg-emerald-50/50 cursor-pointer'
+                      : 'border-slate-300 bg-slate-50/50 hover:bg-slate-50 cursor-pointer'
                   }`}
                 >
                   <input
                     ref={fileInputRef}
                     type="file"
+                    disabled={!selectedCa}
                     accept=".pdf,application/pdf"
-                    onChange={(e) => e.target.files?.[0] && setExamFile(e.target.files[0])}
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        const file = e.target.files[0];
+                        checkMismatchedCa(file, selectedCa);
+                        setExamFile(file);
+                      }
+                    }}
                     className="hidden"
                   />
                   <div className="space-y-2">
@@ -559,10 +638,16 @@ function UploadContent() {
                       <FileText className="w-5 h-5" />
                     </div>
                     <p className="text-sm font-bold text-slate-800 line-clamp-1">
-                      {examFile ? examFile.name : `Kéo thả PDF đề thi ${selectedCa}`}
+                      {!selectedCa
+                        ? 'Chưa chọn loại đề thi'
+                        : examFile
+                        ? examFile.name
+                        : `Kéo thả PDF đề thi ${selectedCa}`}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      {examFile
+                      {!selectedCa
+                        ? 'Bấm chọn 1 mã đề (CA1, CA2, CA3, CA4) ở Bước 1 để mở khóa vùng upload'
+                        : examFile
                         ? `${(examFile.size / 1024 / 1024).toFixed(2)} MB • Nhấp để đổi`
                         : 'File .pdf tối đa 30MB (đọc cả công thức LaTeX & ma trận)'}
                     </p>
@@ -589,18 +674,32 @@ function UploadContent() {
                 <div
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={handleAnswerDrop}
-                  onClick={() => answerFileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition cursor-pointer min-h-[170px] flex flex-col justify-center items-center ${
-                    answerFile
-                      ? 'border-blue-500 bg-blue-50/50'
-                      : 'border-slate-300 bg-slate-50/50 hover:bg-slate-50'
+                  onClick={() => {
+                    if (!selectedCa) {
+                      alert('Vui lòng bấm chọn loại đề thi (CA1, CA2, CA3 hoặc CA4) ở Bước 1 ở trên trước khi chọn file đáp án!');
+                      return;
+                    }
+                    answerFileInputRef.current?.click();
+                  }}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition min-h-[170px] flex flex-col justify-center items-center ${
+                    !selectedCa
+                      ? 'border-slate-200 bg-slate-100/70 cursor-not-allowed opacity-75'
+                      : answerFile
+                      ? 'border-blue-500 bg-blue-50/50 cursor-pointer'
+                      : 'border-slate-300 bg-slate-50/50 hover:bg-slate-50 cursor-pointer'
                   }`}
                 >
                   <input
                     ref={answerFileInputRef}
                     type="file"
+                    disabled={!selectedCa}
                     accept=".pdf,application/pdf"
-                    onChange={(e) => e.target.files?.[0] && setAnswerFile(e.target.files[0])}
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        const file = e.target.files[0];
+                        setAnswerFile(file);
+                      }
+                    }}
                     className="hidden"
                   />
                   <div className="space-y-2">
@@ -608,10 +707,16 @@ function UploadContent() {
                       <FileCheck className="w-5 h-5" />
                     </div>
                     <p className="text-sm font-bold text-slate-800 line-clamp-1">
-                      {answerFile ? answerFile.name : 'Đính kèm PDF đáp án (nếu có)'}
+                      {!selectedCa
+                        ? 'Chưa chọn loại đề thi'
+                        : answerFile
+                        ? answerFile.name
+                        : 'Đính kèm PDF đáp án (nếu có)'}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      {answerFile
+                      {!selectedCa
+                        ? 'Bấm chọn mã đề ở Bước 1 để mở khóa'
+                        : answerFile
                         ? `${(answerFile.size / 1024 / 1024).toFixed(2)} MB • Nhấp để đổi`
                         : 'AI tự động trích xuất đáp án A-D & rubric tự luận'}
                     </p>
@@ -630,6 +735,7 @@ function UploadContent() {
                   type="text"
                   value={examTitle}
                   onChange={(e) => setExamTitle(e.target.value)}
+                  placeholder="VD: Đề thi CA1 - Toán cao cấp Bộ Công An 2026"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22]"
                 />
               </div>
@@ -690,15 +796,21 @@ function UploadContent() {
               <div className="space-y-2.5 text-xs text-slate-600">
                 <div className="flex items-center justify-between">
                   <span>Mã đề đã chọn:</span>
-                  <span className="font-extrabold text-[#0f2d22]">{selectedCa}</span>
+                  <span className={`font-extrabold ${selectedCa ? 'text-[#0f2d22]' : 'text-amber-600'}`}>
+                    {selectedCa || 'Chưa chọn loại đề'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Môn thi:</span>
-                  <span className="font-semibold text-slate-900">{meta.subject}</span>
+                  <span className="font-semibold text-slate-900">
+                    {meta ? meta.subject : 'Chưa chọn'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Cấu trúc câu hỏi:</span>
-                  <span className="font-semibold text-slate-900">{meta.expectedQuestions} câu</span>
+                  <span className="font-semibold text-slate-900">
+                    {meta ? `${meta.expectedQuestions} câu` : '---'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Thời gian thi:</span>
@@ -743,7 +855,7 @@ function UploadContent() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isParsing || (!examFile && !parsedData)}
+                disabled={!selectedCa || isParsing || (!examFile && !parsedData)}
                 className="w-full py-3.5 px-4 bg-[#c1121f] hover:bg-[#a50f1a] font-bold rounded-xl text-sm sm:text-base text-white shadow-md shadow-red-950/20 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
                 {isParsing ? (
@@ -751,8 +863,10 @@ function UploadContent() {
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span>Đang bóc tách đề...</span>
                   </span>
+                ) : !selectedCa ? (
+                  'Vui lòng chọn loại đề thi ở Bước 1'
                 ) : (
-                  'Bóc tách đề với AI Gemini'
+                  `Bóc tách đề ${selectedCa} với AI Gemini`
                 )}
               </button>
 
