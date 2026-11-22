@@ -20,6 +20,8 @@ import {
   PlayCircle,
   Cloud,
   ExternalLink,
+  Edit3,
+  RefreshCw,
 } from 'lucide-react';
 import {
   ParsedExamPreview,
@@ -79,6 +81,8 @@ function UploadContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [savingStep, setSavingStep] = useState<string>('');
   const [savedExamId, setSavedExamId] = useState<string | null>(null);
+  const [lastUpdatedTime, setLastUpdatedTime] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
   const [uploadedB2Files, setUploadedB2Files] = useState<{
     examPdfUrl?: string;
     examPdfName?: string;
@@ -248,9 +252,113 @@ function UploadContent() {
     return parsedData.questions.filter((q) => !isQuestionAnswerValid(q)).length;
   }, [parsedData]);
 
+  // CẬP NHẬT NỘI DUNG ĐỀ THI ĐÃ LƯU (TUYỆT ĐỐI KHÔNG UPLOAD LẠI FILE PDF LÊN BACKBLAZE)
+  const handleUpdateExam = async () => {
+    if (!parsedData || !savedExamId) return;
+
+    if (missingAnswersCount > 0) {
+      setErrorMessage(
+        `Không thể cập nhật! Hiện còn ${missingAnswersCount} câu chưa có đáp án đúng. Vui lòng bấm vào "Bảng Đáp Án Đề Thi" bên dưới để hoàn tất đáp án trước khi lưu.`
+      );
+      const el = document.getElementById('answer-matrix-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage(null);
+    setSavingStep('Đang cập nhật nội dung chỉnh sửa vào CSDL (không upload lại file PDF)...');
+    try {
+      const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
+      const currentUserName = candidate?.fullName || candidate?.username || candidate?.sbd || '';
+      const currentUserEmail = candidate?.email || '';
+
+      const effectiveCa = (selectedCa || (parsedData.paperCode as PaperCode) || 'CA1') as PaperCode;
+      const updatedQuestions = parsedData.questions || [];
+
+      // Đồng bộ đáp án đúng sang các cấu trúc tương thích ngược
+      const singleChoices = (parsedData.singleChoices || []).map((sc) => {
+        const num = parseInt(sc.id?.replace(/\D/g, '') || '0', 10);
+        const q = updatedQuestions.find((item) => item.number === num);
+        return q?.correctAnswer ? { ...sc, correctAnswer: q.correctAnswer as any } : sc;
+      });
+      const groupQuestions = (parsedData.groupQuestions || []).map((g) => ({
+        ...g,
+        subQuestions: (g.subQuestions || []).map((sq) => {
+          const num = parseInt(sq.id?.replace(/\D/g, '') || '0', 10);
+          const q = updatedQuestions.find((item) => item.number === num);
+          return q?.correctAnswer ? { ...sq, correctAnswer: q.correctAnswer as any } : sq;
+        }),
+      }));
+      const shortAnswers = (parsedData.shortAnswers || []).map((sa) => {
+        const num = parseInt(sa.id?.replace(/\D/g, '') || '0', 10);
+        const q = updatedQuestions.find((item) => item.number === num);
+        return q?.correctAnswer ? { ...sa, correctAnswer: q.correctAnswer } : sa;
+      });
+
+      // GIỮ NGUYÊN TẤT CẢ FILE URL TRÊN B2 TỪ LẦN LƯU TRƯỚC, KHÔNG GỌI API UPLOAD B2 NỮA
+      const payload = {
+        ...parsedData,
+        id: savedExamId,
+        paperCode: effectiveCa,
+        examCode: effectiveCa,
+        subject: PAPER_META[effectiveCa]?.subject || '',
+        title: examTitle || parsedData.examTitle || `Đề thi ${effectiveCa}`,
+        duration: parseInt(examDuration, 10) || 150,
+        durationMinutes: parseInt(examDuration, 10) || 150,
+        ownerId: currentUserId || parsedData.ownerId || 'anonymous',
+        userId: currentUserId || parsedData.userId || 'anonymous',
+        ownerName: currentUserName || parsedData.ownerName || '',
+        ownerEmail: currentUserEmail || parsedData.ownerEmail || '',
+        isPublic,
+        // Giữ nguyên các đường dẫn PDF B2 đã lưu, tránh spam upload
+        pdfFileUrl: uploadedB2Files?.examPdfUrl || parsedData.pdfFileUrl,
+        pdfFileName: uploadedB2Files?.examPdfName || parsedData.pdfFileName,
+        b2FileId: parsedData.b2FileId,
+        answerPdfFileUrl: uploadedB2Files?.answerPdfUrl || parsedData.answerPdfFileUrl,
+        answerPdfFileName: uploadedB2Files?.answerPdfName || parsedData.answerPdfFileName,
+        b2UploadedAt: parsedData.b2UploadedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        questions: updatedQuestions,
+        singleChoices,
+        groupQuestions,
+        shortAnswers,
+      };
+
+      const res = await fetch('/api/exams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Lỗi cập nhật CSDL Firebase (Status ${res.status})`);
+      }
+
+      localStorage.setItem(`parsed_exam_${effectiveCa}`, JSON.stringify(payload));
+      localStorage.setItem(`exam_current_${savedExamId}`, JSON.stringify(payload));
+      saveToUserUploadedList(payload);
+      setParsedData(payload);
+      setIsDirty(false);
+      setLastUpdatedTime(new Date().toLocaleTimeString('vi-VN'));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(e);
+      setErrorMessage(`Lỗi cập nhật đề thi: ${msg}`);
+    } finally {
+      setIsSaving(false);
+      setSavingStep('');
+    }
+  };
+
   // Save to DB (Firebase & LocalStorage)
   const handleSaveToDb = async () => {
     if (!parsedData) return;
+
+    // Nếu đề thi đã từng được lưu, chuyển sang chế độ cập nhật, không upload lại B2
+    if (savedExamId) {
+      return handleUpdateExam();
+    }
 
     // Bắt buộc phải có đáp án cho tất cả các câu hỏi
     if (missingAnswersCount > 0) {
@@ -979,33 +1087,54 @@ function UploadContent() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleSaveToDb}
-                  disabled={isSaving}
-                  className={`px-6 py-2.5 font-bold rounded-xl text-sm shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-2 ${
-                    missingAnswersCount > 0
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                      : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                  }`}
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{savingStep || 'Đang lưu đề & Upload B2...'}</span>
-                    </>
-                  ) : missingAnswersCount > 0 ? (
-                    <>
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Lưu đề (Thiếu {missingAnswersCount} đáp án)</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Lưu Ngân hàng Đề</span>
-                    </>
-                  )}
-                </button>
+                {savedExamId ? (
+                  <button
+                    type="button"
+                    onClick={handleUpdateExam}
+                    disabled={isSaving}
+                    className="px-6 py-2.5 font-bold rounded-xl text-sm shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-2 bg-[#0f2d22] hover:bg-[#184232] text-white active:scale-[0.98]"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Đang cập nhật...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Edit3 className="w-4 h-4 text-amber-300" />
+                        <span>Cập nhật chỉnh sửa</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSaveToDb}
+                    disabled={isSaving}
+                    className={`px-6 py-2.5 font-bold rounded-xl text-sm shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-2 ${
+                      missingAnswersCount > 0
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                        : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                    }`}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>{savingStep || 'Đang lưu đề & Upload B2...'}</span>
+                      </>
+                    ) : missingAnswersCount > 0 ? (
+                      <>
+                        <AlertCircle className="w-4 h-4" />
+                        <span>Lưu đề (Thiếu {missingAnswersCount} đáp án)</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Lưu Ngân hàng Đề</span>
+                      </>
+                    )}
+                  </button>
+                )}
 
                 {savedExamId && (
                   <button
@@ -1076,7 +1205,9 @@ function UploadContent() {
                     <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
                     <div>
                       <span className="font-extrabold text-emerald-950 text-base block">
-                        Đề thi & Tệp PDF đã được lưu trữ thành công!
+                        {lastUpdatedTime
+                          ? `Đã cập nhật nội dung đề thi thành công (lúc ${lastUpdatedTime})!`
+                          : 'Đề thi & Tệp PDF đã được lưu trữ thành công!'}
                       </span>
                       <span className="text-xs text-emerald-800">
                         Mã đề: <strong>{savedExamId}</strong> &bull; Gắn với ID tài khoản:{' '}
@@ -1087,13 +1218,24 @@ function UploadContent() {
                       </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => router.push('/select-exam')}
-                    className="text-xs font-bold text-white bg-emerald-800 hover:bg-emerald-900 px-4 py-2 rounded-xl shrink-0 cursor-pointer transition shadow-xs"
-                  >
-                    Vào Ngân hàng đề thi &rarr;
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleUpdateExam}
+                      disabled={isSaving}
+                      className="text-xs font-bold text-emerald-950 bg-emerald-200 hover:bg-emerald-300 px-3.5 py-2 rounded-xl shrink-0 cursor-pointer transition flex items-center gap-1.5 active:scale-[0.98]"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Cập nhật chỉnh sửa</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/select-exam')}
+                      className="text-xs font-bold text-white bg-emerald-800 hover:bg-emerald-900 px-4 py-2 rounded-xl shrink-0 cursor-pointer transition shadow-xs"
+                    >
+                      Vào Ngân hàng đề thi &rarr;
+                    </button>
+                  </div>
                 </div>
 
                 {/* Khối hiển thị liên kết lưu trữ Backblaze B2 */}
@@ -1102,13 +1244,13 @@ function UploadContent() {
                     <div className="flex items-center gap-2 text-emerald-900">
                       <Cloud className="w-4 h-4 text-emerald-700" />
                       <span>
-                        Đã tải và lưu trữ tệp an toàn trên <strong>Backblaze B2</strong> (Bucket: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono font-bold text-emerald-900">file-vb2</code>)
+                        File PDF gốc đã lưu an toàn trên <strong>Backblaze B2</strong> (Bucket: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono font-bold text-emerald-900">file-vb2</code>). Mọi chỉnh sửa nội dung sẽ <strong>chỉ cập nhật dữ liệu đề thi mà không tải lại file PDF cũ</strong>, tránh spam trùng lặp.
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      {uploadedB2Files?.examPdfUrl && (
+                      {(uploadedB2Files?.examPdfUrl || parsedData.pdfFileUrl) && (
                         <a
-                          href={uploadedB2Files.examPdfUrl}
+                          href={uploadedB2Files?.examPdfUrl || parsedData.pdfFileUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-bold text-emerald-800 hover:text-emerald-950 underline flex items-center gap-1"
@@ -1117,9 +1259,9 @@ function UploadContent() {
                           <span>Xem PDF Đề thi gốc trên B2</span>
                         </a>
                       )}
-                      {uploadedB2Files?.answerPdfUrl && (
+                      {(uploadedB2Files?.answerPdfUrl || parsedData.answerPdfFileUrl) && (
                         <a
-                          href={uploadedB2Files.answerPdfUrl}
+                          href={uploadedB2Files?.answerPdfUrl || parsedData.answerPdfFileUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-bold text-blue-800 hover:text-blue-950 underline flex items-center gap-1"
@@ -1137,7 +1279,10 @@ function UploadContent() {
             {/* Component Xem trước và chỉnh sửa 4 dạng câu hỏi */}
             <ParsedExamPreview
               data={parsedData}
-              onChange={(updated) => setParsedData(updated)}
+              onChange={(updated) => {
+                setParsedData(updated);
+                setIsDirty(true);
+              }}
             />
           </div>
         )}
