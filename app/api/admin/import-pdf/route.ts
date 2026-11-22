@@ -36,7 +36,8 @@ async function callGeminiPdf<T>(
   schema: object,
 ): Promise<T | null> {
   const candidateModels = [
-   'gemini-3.8-flash',       // Ưu tiên 1: Nhanh, rẻ, chuẩn LaTeX
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',          // Ưu tiên 1: Nhanh, rẻ, chuẩn LaTeX
   'gemini-4-hydrogen',      // Ưu tiên 2: Dòng Gemini 4 dự phòng
   'gemini-3.5-flash-lite'   // Ưu tiên 3: Siêu tiết kiệm
   ];
@@ -207,7 +208,7 @@ export async function POST(req: NextRequest) {
           level: 'BIET' as const,
           content: q.stem,
           options: optionsObj,
-          correctAnswer: (q.correctAnswer || 'A') as 'A' | 'B' | 'C' | 'D',
+          correctAnswer: (q.correctAnswer || '') as any,
         };
       });
 
@@ -228,7 +229,7 @@ export async function POST(req: NextRequest) {
             level: 'HIEU' as const,
             content: q.stem,
             options: optionsObj,
-            correctAnswer: (q.correctAnswer || 'A') as 'A' | 'B' | 'C' | 'D',
+            correctAnswer: (q.correctAnswer || '') as any,
           };
         }),
     }));
@@ -243,68 +244,14 @@ export async function POST(req: NextRequest) {
         correctAnswer: q.correctAnswer || '',
       }));
 
-    // 8. Lưu vào Firebase Realtime Database
+    // Tạo mã đề thi tạm thời
     const examId = `${paperCode.toLowerCase()}_${Date.now()}`;
-    let savedToFirebase = false;
+    const savedToFirebase = false;
 
-    const examRecord = {
-      id: examId,
-      ownerId: finalOwnerId,
-      userId: finalOwnerId,
-      ownerName,
-      ownerEmail,
-      isPublic: isPublicParam,
-      examCode: paperCode,
-      paperCode,
-      subject: PAPER_META[paperCode]?.subject || 'Môn thi chuyên ngành',
-      title: extractedExam.examTitle || `Đề thi ${paperCode} - ${PAPER_META[paperCode]?.subject || ''}`,
-      duration: durationMinutes,
-      durationMinutes,
-      totalQuestions: extractedExam.questions.length,
-      essay: {
-        prompt: extractedExam.essay.prompt,
-        citation: extractedExam.essay.citation,
-        minWords: extractedExam.essay.minWords,
-        points: extractedExam.essay.maxPoints,
-        question: extractedExam.essay.prompt,
-      },
-      groups: extractedExam.groups,
-      questions: extractedExam.questions,
-      domainQuestions,
-      singleChoices,
-      groupQuestions,
-      shortAnswers,
-      createdAt: new Date().toISOString(),
-      status: validationErrors.length > 0 ? 'needs_review' : 'published',
-      warnings: extractedExam.warnings || [],
-    };
+    const examTitle = customTitle || extractedExam.examTitle || `Đề thi ${paperCode} - ${PAPER_META[paperCode]?.subject || ''}`;
 
-    try {
-      const fbRes = await fetch(`${FIREBASE_DB_URL}/exams/${examId}.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(examRecord),
-        signal: AbortSignal.timeout(6000),
-      });
-      if (fbRes.ok) {
-        savedToFirebase = true;
-      }
-    } catch (fbErr: unknown) {
-      const msg = fbErr instanceof Error ? fbErr.message : String(fbErr);
-      console.warn('Lỗi ghi Firebase Realtime REST:', msg);
-    }
-
-    // Đồng thời đồng bộ sang Firestore
-    try {
-      if (adminDb && finalOwnerId && finalOwnerId !== 'anonymous') {
-        await adminDb.collection('exams').doc(examId).set({
-          ...examRecord,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    } catch (fsErr) {
-      console.warn('Lưu Firestore phụ:', fsErr);
-    }
+    // Lưu ý: KHÔNG lưu vào Firebase ngay khi upload.
+    // Người dùng phải duyệt, chỉnh sửa hoặc bổ sung đầy đủ đáp án rồi mới bấm Lưu đề thi!
 
     return NextResponse.json({
       success: true,
@@ -313,10 +260,12 @@ export async function POST(req: NextRequest) {
       userId: finalOwnerId,
       ownerName,
       ownerEmail,
+      isPublic: isPublicParam,
       examCode: paperCode,
       paperCode,
       subject: PAPER_META[paperCode]?.subject || '',
-      examTitle: examRecord.title,
+      examTitle,
+      title: examTitle,
       durationMinutes,
       totalQuestions: extractedExam.questions.length,
       essay: extractedExam.essay,
@@ -327,8 +276,9 @@ export async function POST(req: NextRequest) {
       groupQuestions,
       shortAnswers,
       validationErrors,
-      warnings: examRecord.warnings,
+      warnings: extractedExam.warnings || [],
       savedToFirebase,
+      hasAnswerFile: Boolean(extractedKey && extractedKey.answers && extractedKey.answers.length > 0),
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Có lỗi xảy ra khi xử lý file đề thi.';

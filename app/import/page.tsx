@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useRef, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -19,7 +19,11 @@ import {
   X,
   PlayCircle,
 } from 'lucide-react';
-import { ParsedExamPreview, ParsedData } from '@/components/admin/ParsedExamPreview';
+import {
+  ParsedExamPreview,
+  ParsedData,
+  isQuestionAnswerValid,
+} from '@/components/admin/ParsedExamPreview';
 import { PaperCode, PAPER_META } from '@/types/exam';
 
 interface CandidateInfo {
@@ -185,12 +189,7 @@ function UploadContent() {
       };
 
       setParsedData(examPayload);
-      setSavedExamId(examId);
-
-      // Lưu vào localStorage phục vụ làm bài tức thì
-      localStorage.setItem(`parsed_exam_${selectedCa}`, JSON.stringify(examPayload));
-      localStorage.setItem(`exam_current_${examId}`, JSON.stringify(examPayload));
-      saveToUserUploadedList(examPayload);
+      setSavedExamId(null); // Chưa lưu vào Firebase ngay, chờ người dùng duyệt và điền đáp án
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('Lỗi gọi API AI:', msg);
@@ -202,9 +201,26 @@ function UploadContent() {
     }
   };
 
+  // Tính số lượng câu chưa có đáp án
+  const missingAnswersCount = useMemo(() => {
+    if (!parsedData?.questions || parsedData.questions.length === 0) return 0;
+    return parsedData.questions.filter((q) => !isQuestionAnswerValid(q)).length;
+  }, [parsedData]);
+
   // Save to DB (Firebase & LocalStorage)
   const handleSaveToDb = async () => {
     if (!parsedData) return;
+
+    // Bắt buộc phải có đáp án cho tất cả các câu hỏi
+    if (missingAnswersCount > 0) {
+      setErrorMessage(
+        `Không thể lưu đề thi! Hiện còn ${missingAnswersCount} câu chưa có đáp án đúng. Vui lòng bấm vào "Bảng Đáp Án Đề Thi" bên dưới để hoàn tất đáp án trước khi lưu.`
+      );
+      const el = document.getElementById('answer-matrix-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
     setIsSaving(true);
     setErrorMessage(null);
     try {
@@ -213,6 +229,28 @@ function UploadContent() {
       const currentUserEmail = candidate?.email || '';
 
       const examId = savedExamId || `${selectedCa.toLowerCase()}_${Date.now()}`;
+      const updatedQuestions = parsedData.questions || [];
+
+      // Đồng bộ đáp án đúng sang các cấu trúc tương thích ngược
+      const singleChoices = (parsedData.singleChoices || []).map((sc) => {
+        const num = parseInt(sc.id?.replace(/\D/g, '') || '0', 10);
+        const q = updatedQuestions.find((item) => item.number === num);
+        return q?.correctAnswer ? { ...sc, correctAnswer: q.correctAnswer as any } : sc;
+      });
+      const groupQuestions = (parsedData.groupQuestions || []).map((g) => ({
+        ...g,
+        subQuestions: (g.subQuestions || []).map((sq) => {
+          const num = parseInt(sq.id?.replace(/\D/g, '') || '0', 10);
+          const q = updatedQuestions.find((item) => item.number === num);
+          return q?.correctAnswer ? { ...sq, correctAnswer: q.correctAnswer as any } : sq;
+        }),
+      }));
+      const shortAnswers = (parsedData.shortAnswers || []).map((sa) => {
+        const num = parseInt(sa.id?.replace(/\D/g, '') || '0', 10);
+        const q = updatedQuestions.find((item) => item.number === num);
+        return q?.correctAnswer ? { ...sa, correctAnswer: q.correctAnswer } : sa;
+      });
+
       const payload = {
         ...parsedData,
         id: examId,
@@ -227,6 +265,10 @@ function UploadContent() {
         ownerName: currentUserName || parsedData.ownerName || '',
         ownerEmail: currentUserEmail || parsedData.ownerEmail || '',
         isPublic,
+        questions: updatedQuestions,
+        singleChoices,
+        groupQuestions,
+        shortAnswers,
       };
 
       const res = await fetch('/api/exams', {
@@ -737,17 +779,26 @@ function UploadContent() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={handleSaveToDb}
                   disabled={isSaving}
-                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-sm shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                  className={`px-6 py-2.5 font-bold rounded-xl text-sm shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-2 ${
+                    missingAnswersCount > 0
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                      : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                  }`}
                 >
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Đang lưu...</span>
+                      <span>Đang lưu vào Firebase...</span>
+                    </>
+                  ) : missingAnswersCount > 0 ? (
+                    <>
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Lưu đề (Thiếu {missingAnswersCount} đáp án)</span>
                     </>
                   ) : (
                     <>
@@ -770,12 +821,49 @@ function UploadContent() {
               </div>
             </div>
 
+            {/* Thông báo tình trạng đáp án trước khi lưu */}
+            {!savedExamId && missingAnswersCount > 0 && (
+              <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-sm flex items-start gap-3 shadow-xs">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold text-amber-950 block">
+                    Yêu cầu hoàn tất đáp án: Còn {missingAnswersCount} câu hỏi chưa có đáp án đúng!
+                  </span>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    {answerFile
+                      ? `File đáp án bóc tách chưa nhận diện đủ toàn bộ các câu trong đề.`
+                      : `Bạn không tải lên file đáp án kèm theo file đề thi.`}
+                    {' '}Theo quy định, bạn phải điền đáp án cho tất cả {parsedData.questions?.length || 50} câu hỏi tại <strong>Bảng Đáp Án Đề Thi</strong> bên dưới thì mới được lưu đề thi vào CSDL Firebase.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!savedExamId && missingAnswersCount === 0 && (
+              <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-900 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium">
+                    Đã hoàn thành 100% đáp án cho toàn bộ {parsedData.questions?.length || 50} câu hỏi. Bạn hãy bấm <strong>"Lưu Ngân hàng Đề"</strong> để lưu chính thức vào CSDL Firebase.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveToDb}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shrink-0 cursor-pointer"
+                >
+                  Lưu đề ngay
+                </button>
+              </div>
+            )}
+
             {savedExamId && (
               <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-900 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-2.5 font-medium">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                   <span>
-                    Đề thi đã được lưu thành công với mã <strong>{savedExamId}</strong> (gắn với ID tài khoản:{' '}
+                    Đề thi đã được lưu thành công vào CSDL Firebase với mã <strong>{savedExamId}</strong> (gắn với ID tài khoản:{' '}
                     <strong className="font-mono text-emerald-950">
                       {candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || 'Tạm thời'}
                     </strong>

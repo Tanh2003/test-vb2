@@ -14,6 +14,7 @@ import {
 import {
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   FileText,
   Layers,
   ChevronDown,
@@ -75,6 +76,15 @@ export interface ParsedData {
   shortAnswers?: ShortAnswerQuestion[];
 }
 
+export const isQuestionAnswerValid = (q: PreviewQuestion): boolean => {
+  const ans = (q.correctAnswer || '').trim();
+  if (!ans) return false;
+  if (q.type === 'mcq') {
+    return ['A', 'B', 'C', 'D'].includes(ans.toUpperCase());
+  }
+  return ans.length > 0;
+};
+
 interface Props {
   data: ParsedData;
   onChange: (updated: ParsedData) => void;
@@ -85,7 +95,7 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
   const meta = PAPER_META[paperCode] || PAPER_META.CA1;
 
   const [activeFilter, setActiveFilter] = useState<
-    'ALL' | 'mcq' | 'short_numeric' | 'short_blanks' | 'short_text' | 'REVIEW'
+    'ALL' | 'mcq' | 'short_numeric' | 'short_blanks' | 'short_text' | 'REVIEW' | 'MISSING'
   >('ALL');
   const [showGroups, setShowGroups] = useState(true);
   const [showEssay, setShowEssay] = useState(true);
@@ -110,7 +120,7 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
             { key: 'C', text: sc.options?.C || '' },
             { key: 'D', text: sc.options?.D || '' },
           ],
-          correctAnswer: sc.correctAnswer || 'A',
+          correctAnswer: sc.correctAnswer || '',
           blankPool: [],
           blankCount: 0,
           confidence: 0.95,
@@ -132,7 +142,7 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
               { key: 'C', text: sq.options?.C || '' },
               { key: 'D', text: sq.options?.D || '' },
             ],
-            correctAnswer: sq.correctAnswer || 'A',
+            correctAnswer: sq.correctAnswer || '',
             blankPool: [],
             blankCount: 0,
             confidence: 0.95,
@@ -165,6 +175,7 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
     let short_blanks = 0;
     let short_text = 0;
     let review = 0;
+    let missing = 0;
     for (const q of questions) {
       if (q.type === 'mcq') mcq++;
       else if (q.type === 'short_numeric') short_numeric++;
@@ -174,13 +185,19 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
       if (q.needsReview || (q.confidence !== undefined && q.confidence < 0.8) || q.hasFigureOrTable) {
         review++;
       }
+      if (!isQuestionAnswerValid(q)) {
+        missing++;
+      }
     }
-    return { total: questions.length, mcq, short_numeric, short_blanks, short_text, review };
+    return { total: questions.length, mcq, short_numeric, short_blanks, short_text, review, missing };
   }, [questions]);
 
   // Bộ lọc câu hỏi
   const filteredQuestions = useMemo(() => {
     if (activeFilter === 'ALL') return questions;
+    if (activeFilter === 'MISSING') {
+      return questions.filter((q) => !isQuestionAnswerValid(q));
+    }
     if (activeFilter === 'REVIEW') {
       return questions.filter(
         (q) => q.needsReview || (q.confidence !== undefined && q.confidence < 0.8) || q.hasFigureOrTable
@@ -311,7 +328,7 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
         )}
 
         {/* 5 Thẻ thống kê dạng câu (Nền nhẹ sáng) */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 pt-1">
           <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-center">
             <div className="text-xs text-slate-500 font-semibold mb-0.5">Trắc nghiệm MCQ</div>
             <div className="text-lg font-extrabold text-blue-700">{counts.mcq} câu</div>
@@ -328,10 +345,18 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
             <div className="text-xs text-slate-500 font-semibold mb-0.5">Khái niệm (Text)</div>
             <div className="text-lg font-extrabold text-amber-700">{counts.short_text} câu</div>
           </div>
-          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-center col-span-2 sm:col-span-1">
+          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-center">
             <div className="text-xs text-slate-500 font-semibold mb-0.5">Cần xem lại (!)</div>
             <div className={`text-lg font-extrabold ${counts.review > 0 ? 'text-red-600' : 'text-slate-400'}`}>
               {counts.review} câu
+            </div>
+          </div>
+          <div className={`p-3 rounded-2xl border text-center ${counts.missing > 0 ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-300'}`}>
+            <div className={`text-xs font-semibold mb-0.5 ${counts.missing > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>
+              {counts.missing > 0 ? 'Thiếu đáp án' : 'Đủ đáp án'}
+            </div>
+            <div className={`text-lg font-extrabold ${counts.missing > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+              {counts.missing > 0 ? `${counts.missing} câu` : '100%'}
             </div>
           </div>
         </div>
@@ -450,7 +475,109 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
         </div>
       )}
 
-      {/* 4. PHẦN III: DANH SÁCH CÂU HỎI & BỘ LỌC */}
+      {/* 4. BẢNG ĐIỀN NHANH ĐÁP ÁN CHO ĐỀ THI */}
+      <div id="answer-matrix-section" className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+            </div>
+            <div>
+              <h4 className="font-extrabold text-base text-[#0f2d22]">
+                Bảng Đáp Án Đề Thi ({questions.length - counts.missing}/{questions.length} câu)
+              </h4>
+              <p className="text-xs text-slate-500 font-medium">
+                Điền nhanh phương án đúng cho các câu hỏi trước khi lưu vào ngân hàng đề
+              </p>
+            </div>
+          </div>
+
+          {counts.missing > 0 ? (
+            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+              <span>Bắt buộc: Còn {counts.missing} câu chưa có đáp án</span>
+            </span>
+          ) : (
+            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Đã đủ 100% đáp án (Đủ điều kiện lưu đề)</span>
+            </span>
+          )}
+        </div>
+
+        {/* Ma trận nút bấm chọn đáp án nhanh */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-2 max-h-[360px] overflow-y-auto p-1">
+          {questions.map((q) => {
+            const originalIdx = questions.findIndex((item) => item.number === q.number);
+            const hasAns = isQuestionAnswerValid(q);
+
+            return (
+              <div
+                key={q.number}
+                className={`p-2 rounded-xl border flex flex-col justify-between gap-1.5 transition ${
+                  hasAns
+                    ? 'bg-emerald-50/60 border-emerald-200'
+                    : 'bg-amber-50/80 border-amber-300 ring-1 ring-amber-300'
+                }`}
+              >
+                <div className="flex items-center justify-between text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById(`question-card-${q.number}`);
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
+                    className="text-[#0f2d22] hover:underline cursor-pointer"
+                    title={`Cuộn đến Câu ${q.number}`}
+                  >
+                    C.{q.number}
+                  </button>
+                  <span
+                    className={`text-[9px] uppercase px-1 rounded ${
+                      hasAns
+                        ? 'bg-emerald-200/60 text-emerald-900 font-bold'
+                        : 'bg-amber-200 text-amber-900 font-extrabold'
+                    }`}
+                  >
+                    {hasAns ? q.correctAnswer : 'Thiếu'}
+                  </span>
+                </div>
+
+                {q.type === 'mcq' ? (
+                  <div className="grid grid-cols-4 gap-0.5">
+                    {(['A', 'B', 'C', 'D'] as const).map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => updateQuestion(originalIdx, { correctAnswer: key })}
+                        className={`py-1 text-[10px] font-black rounded transition cursor-pointer ${
+                          q.correctAnswer === key
+                            ? 'bg-emerald-700 text-white shadow-2xs'
+                            : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={q.correctAnswer || ''}
+                    onChange={(e) =>
+                      updateQuestion(originalIdx, { correctAnswer: e.target.value })
+                    }
+                    placeholder={q.type === 'short_numeric' ? 'Số...' : 'Chữ...'}
+                    className="w-full text-[10px] font-mono bg-white border border-slate-300 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:border-emerald-600"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 5. PHẦN IV: DANH SÁCH CÂU HỎI & BỘ LỌC */}
       <div className="space-y-4">
         {/* Bộ lọc loại câu hỏi */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm">
@@ -512,30 +639,51 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveFilter('REVIEW')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-              activeFilter === 'REVIEW'
-                ? 'bg-[#c1121f] text-white shadow-xs'
-                : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Cần xem lại ({counts.review})</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveFilter('MISSING')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                activeFilter === 'MISSING'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : counts.missing > 0
+                  ? 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 font-extrabold'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>Chưa có đáp án ({counts.missing})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveFilter('REVIEW')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                activeFilter === 'REVIEW'
+                  ? 'bg-[#c1121f] text-white shadow-xs'
+                  : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Cần xem lại ({counts.review})</span>
+            </button>
+          </div>
         </div>
 
         {/* Danh sách từng câu hỏi (Nền thẻ trắng đẹp mắt) */}
         <div className="space-y-4">
           {filteredQuestions.map((q) => {
             const originalIdx = questions.findIndex((item) => item.number === q.number);
+            const hasAns = isQuestionAnswerValid(q);
 
             return (
               <div
                 key={q.number}
+                id={`question-card-${q.number}`}
                 className={`bg-white border rounded-3xl p-6 space-y-4 transition-all shadow-sm ${
-                  q.needsReview
+                  !hasAns
+                    ? 'border-amber-400 ring-2 ring-amber-100'
+                    : q.needsReview
                     ? 'border-red-400 ring-2 ring-red-100'
                     : 'border-slate-200/90 hover:border-slate-300'
                 }`}
@@ -578,6 +726,13 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
                     {q.hasFigureOrTable && (
                       <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
                         Hình vẽ / Bảng
+                      </span>
+                    )}
+
+                    {!hasAns && (
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        <span>Chưa có đáp án</span>
                       </span>
                     )}
                   </div>
@@ -623,6 +778,11 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
                       <span>4 Phương án A - B - C - D:</span>
                       <div className="flex items-center gap-2 font-normal">
                         <span className="font-semibold text-slate-600">Đáp án đúng:</span>
+                        {!q.correctAnswer && (
+                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-300">
+                            (Chưa chọn)
+                          </span>
+                        )}
                         <div className="flex items-center gap-1.5">
                           {(['A', 'B', 'C', 'D'] as const).map((key) => (
                             <button
