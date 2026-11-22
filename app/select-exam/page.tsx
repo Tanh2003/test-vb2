@@ -65,14 +65,17 @@ export default function SelectExamPage() {
   }, []);
 
   const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
+  const currentUserEmail = candidate?.email || '';
 
   const fetchExams = useCallback(async () => {
     setIsLoading(true);
     try {
-      const url = currentUserId
-        ? `/api/exams?userId=${encodeURIComponent(currentUserId)}`
-        : '/api/exams';
-      const res = await fetch(url);
+      const params = new URLSearchParams();
+      if (currentUserId) params.set('userId', currentUserId);
+      if (currentUserEmail) params.set('email', currentUserEmail);
+
+      const url = params.toString() ? `/api/exams?${params.toString()}` : '/api/exams';
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       if (Array.isArray(data)) {
@@ -85,40 +88,11 @@ export default function SelectExamPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, currentUserEmail]);
 
   useEffect(() => {
-    let ignore = false;
-    const run = async () => {
-      try {
-        const url = currentUserId
-          ? `/api/exams?userId=${encodeURIComponent(currentUserId)}`
-          : '/api/exams';
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Failed to fetch');
-        const data = await res.json();
-        if (!ignore) {
-          if (Array.isArray(data)) {
-            setExams(data);
-          } else {
-            setExams([]);
-          }
-        }
-      } catch {
-        if (!ignore) {
-          setExams([]);
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
-    };
-    run();
-    return () => {
-      ignore = true;
-    };
-  }, [currentUserId]);
+    fetchExams();
+  }, [fetchExams]);
 
   const filteredExams = exams.filter((e) => {
     // Lọc theo Ca (CA1/CA2/CA3/CA4)

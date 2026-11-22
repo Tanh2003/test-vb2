@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const queryUserId = searchParams.get('userId') || searchParams.get('ownerId');
+    const queryEmail = searchParams.get('email');
     const userOnly = searchParams.get('userOnly') === 'true';
     const isPublicOnly = searchParams.get('isPublic') === 'true';
     const singleExamId = searchParams.get('id');
@@ -36,16 +37,28 @@ export async function GET(req: NextRequest) {
 
     // 1. Trường hợp truy vấn 1 đề cụ thể theo ID
     if (singleExamId) {
-      const singleRes = await fetch(`${FIREBASE_DB_URL}/exams/${singleExamId}.json`, {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(6000),
-      });
+      // Thử đọc từ Realtime Database trước
+      let singleData: any = null;
+      try {
+        const singleRes = await fetch(`${FIREBASE_DB_URL}/exams/${singleExamId}.json`, {
+          cache: 'no-store',
+          signal: AbortSignal.timeout(6000),
+        });
+        if (singleRes.ok) {
+          singleData = await singleRes.json();
+        }
+      } catch {}
 
-      if (!singleRes.ok) {
-        return NextResponse.json({ error: 'Không tìm thấy đề thi' }, { status: 404 });
+      // Nếu RTDB không có, thử đọc từ Firestore
+      if (!singleData && adminDb) {
+        try {
+          const docSnap = await adminDb.collection('exams').doc(singleExamId).get();
+          if (docSnap.exists) {
+            singleData = docSnap.data();
+          }
+        } catch {}
       }
 
-      const singleData = await singleRes.json();
       if (!singleData) {
         return NextResponse.json({ error: 'Không tìm thấy đề thi' }, { status: 404 });
       }
@@ -55,7 +68,9 @@ export async function GET(req: NextRequest) {
 
       // Nếu là đề riêng tư, chỉ cho phép chính chủ sở hữu truy cập
       if (!isPublic) {
-        if (!activeUserId || owner !== activeUserId) {
+        const isOwner = (activeUserId && owner === activeUserId) || 
+                        (queryEmail && singleData.ownerEmail && singleData.ownerEmail.toLowerCase() === queryEmail.toLowerCase());
+        if (!isOwner) {
           return NextResponse.json(
             { error: 'Bạn không có quyền truy cập đề thi riêng tư của tài khoản khác' },
             { status: 403 }
@@ -66,27 +81,63 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(singleData);
     }
 
-    // 2. Trường hợp lấy danh sách đề thi từ Firebase
-    const res = await fetch(`${FIREBASE_DB_URL}/exams.json`, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
-    });
+    // 2. Trường hợp lấy danh sách đề thi từ Firebase (Realtime Database & Firestore)
+    const examMap = new Map<string, any>();
 
-    if (!res.ok) {
-      return NextResponse.json([]);
+    // A. Lấy từ Firebase Realtime Database
+    try {
+      const res = await fetch(`${FIREBASE_DB_URL}/exams.json`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          Object.keys(data).forEach((key) => {
+            const item = data[key];
+            if (item) {
+              const id = item.id || key;
+              examMap.set(id, { ...item, id });
+            }
+          });
+        }
+      }
+    } catch (rtdbErr) {
+      console.warn('Lỗi đọc RTDB:', rtdbErr);
     }
 
-    const data = await res.json();
-    if (!data) return NextResponse.json([]);
+    // B. Dự phòng & Hợp nhất từ Firestore
+    try {
+      if (adminDb) {
+        let snapshot;
+        if (userOnly && activeUserId) {
+          snapshot = await adminDb.collection('exams').where('ownerId', '==', activeUserId).get();
+        } else if (isPublicOnly) {
+          snapshot = await adminDb.collection('exams').where('isPublic', '==', true).get();
+        } else {
+          snapshot = await adminDb.collection('exams').limit(100).get();
+        }
 
-    const allExams = Object.keys(data).map((key) => {
-      const item = data[key];
+        if (snapshot && !snapshot.empty) {
+          snapshot.docs.forEach((doc) => {
+            const item = doc.data();
+            if (item && !examMap.has(doc.id)) {
+              examMap.set(doc.id, { ...item, id: doc.id });
+            }
+          });
+        }
+      }
+    } catch (fsErr) {
+      console.warn('Lỗi đọc Firestore exams:', fsErr);
+    }
+
+    const allExams = Array.from(examMap.values()).map((item) => {
       const pCode = (item.paperCode || item.examCode || 'CA1') as PaperCode;
       const owner = item.ownerId || item.userId || '';
 
       return {
         ...item,
-        id: item.id || key,
         ownerId: owner,
         userId: owner,
         paperCode: pCode,
@@ -97,6 +148,13 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const checkIsOwner = (exam: any) => {
+      if (!activeUserId && !queryEmail) return false;
+      const matchId = activeUserId && (exam.ownerId === activeUserId || exam.userId === activeUserId);
+      const matchEmail = queryEmail && exam.ownerEmail && exam.ownerEmail.toLowerCase() === queryEmail.toLowerCase();
+      return Boolean(matchId || matchEmail);
+    };
+
     // Lọc nghiêm ngặt theo quyền tài khoản:
     let filteredExams: typeof allExams = [];
 
@@ -105,20 +163,11 @@ export async function GET(req: NextRequest) {
       filteredExams = allExams.filter((exam) => exam.isPublic === true);
     } else if (userOnly) {
       // Chỉ lấy đề do chính tài khoản này upload
-      if (!activeUserId) {
-        return NextResponse.json([]);
-      }
-      filteredExams = allExams.filter(
-        (exam) => exam.ownerId === activeUserId || exam.userId === activeUserId
-      );
-    } else if (activeUserId) {
+      filteredExams = allExams.filter((exam) => checkIsOwner(exam));
+    } else if (activeUserId || queryEmail) {
       // Người dùng đăng nhập: Chỉ thấy đề của chính mình + đề công khai
       // TUYỆT ĐỐI KHÔNG hiển thị đề riêng tư của người dùng khác
-      filteredExams = allExams.filter((exam) => {
-        const isOwner = exam.ownerId === activeUserId || exam.userId === activeUserId;
-        const isPublic = exam.isPublic === true;
-        return isOwner || isPublic;
-      });
+      filteredExams = allExams.filter((exam) => checkIsOwner(exam) || exam.isPublic === true);
     } else {
       // Chưa đăng nhập: Chỉ thấy đề công khai
       filteredExams = allExams.filter((exam) => exam.isPublic === true);

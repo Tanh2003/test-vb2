@@ -103,76 +103,50 @@ function UploadHistoryContent() {
   }, [router]);
 
   const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
+  const currentUserEmail = candidate?.email || '';
 
-  // Lấy danh sách đề thi đã upload của tài khoản
+  // Lấy danh sách đề thi đã upload của tài khoản TRỰC TIẾP TỪ FIREBASE (Tuyệt đối không lưu hay đọc qua localStorage)
   const fetchUploadedExams = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Lấy danh sách từ CSDL Firebase (lọc theo userId)
-      const url = currentUserId
-        ? `/api/exams?userId=${encodeURIComponent(currentUserId)}&userOnly=true`
-        : '/api/exams?userOnly=true';
-      const res = await fetch(url, { cache: 'no-store' });
-      let serverExams: UploadedExamItem[] = [];
+      const params = new URLSearchParams();
+      params.set('userOnly', 'true');
+      if (currentUserId) params.set('userId', currentUserId);
+      if (currentUserEmail) params.set('email', currentUserEmail);
+
+      const res = await fetch(`/api/exams?${params.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          serverExams = data;
+          // Sắp xếp theo ngày cập nhật mới nhất
+          data.sort((a, b) => {
+            const dateA = new Date(a.updatedAt || a.b2UploadedAt || a.createdAt || 0).getTime();
+            const dateB = new Date(b.updatedAt || b.b2UploadedAt || b.createdAt || 0).getTime();
+            return dateB - dateA;
+          });
+          setExams(data);
+        } else {
+          setExams([]);
         }
+      } else {
+        setExams([]);
       }
-
-      // 2. Lấy thêm từ LocalStorage (đề vừa upload hoặc lưu offline)
-      let localExams: UploadedExamItem[] = [];
-      try {
-        const raw = localStorage.getItem('user_uploaded_exams_list');
-        if (raw) {
-          localExams = JSON.parse(raw);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-
-      // 3. Hợp nhất dữ liệu, ưu tiên dữ liệu mới nhất
-      const examMap = new Map<string, UploadedExamItem>();
-      for (const item of serverExams) {
-        if (item && item.id) examMap.set(item.id, item);
-      }
-      for (const item of localExams) {
-        if (item && item.id) {
-          if (!examMap.has(item.id)) {
-            examMap.set(item.id, item);
-          } else {
-            // Merge dữ liệu
-            examMap.set(item.id, { ...examMap.get(item.id)!, ...item });
-          }
-        }
-      }
-
-      const mergedList = Array.from(examMap.values());
-      // Sắp xếp theo ngày cập nhật mới nhất
-      mergedList.sort((a, b) => {
-        const dateA = new Date(a.updatedAt || a.b2UploadedAt || a.createdAt || 0).getTime();
-        const dateB = new Date(b.updatedAt || b.b2UploadedAt || b.createdAt || 0).getTime();
-        return dateB - dateA;
-      });
-
-      setExams(mergedList);
     } catch (error) {
-      console.error('Lỗi tải danh sách upload:', error);
+      console.error('Lỗi tải danh sách upload từ Firebase:', error);
       setExams([]);
     } finally {
       setIsLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, currentUserEmail]);
 
   useEffect(() => {
     fetchUploadedExams();
   }, [fetchUploadedExams]);
 
-  // Xoá đề thi
+  // Xoá đề thi trực tiếp trên Firebase
   const handleDeleteExam = async (exam: UploadedExamItem) => {
     const confirmDelete = confirm(
-      `Bạn có chắc chắn muốn xoá đề thi "${exam.title || exam.id}" khỏi hệ thống không?\n\nHành động này không thể hoàn tác.`
+      `Bạn có chắc chắn muốn xoá đề thi "${exam.title || exam.id}" khỏi hệ thống Firebase không?\n\nHành động này không thể hoàn tác.`
     );
     if (!confirmDelete) return;
 
@@ -187,19 +161,8 @@ function UploadHistoryContent() {
         throw new Error(errJson.error || `Mã lỗi: ${res.status}`);
       }
 
-      // Cập nhật state & LocalStorage
+      // Cập nhật state hiển thị
       setExams((prev) => prev.filter((item) => item.id !== exam.id));
-      try {
-        const raw = localStorage.getItem('user_uploaded_exams_list');
-        if (raw) {
-          const list = JSON.parse(raw).filter((item: any) => item.id !== exam.id);
-          localStorage.setItem('user_uploaded_exams_list', JSON.stringify(list));
-        }
-        localStorage.removeItem(`exam_current_${exam.id}`);
-      } catch (e) {
-        console.error(e);
-      }
-
       if (expandedExamId === exam.id) {
         setExpandedExamId(null);
       }
@@ -396,9 +359,15 @@ function UploadHistoryContent() {
                 )
               </span>
             </div>
-            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200">
-              Chỉ tài khoản của bạn xem được
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
+                <Cloud className="w-3.5 h-3.5 text-emerald-700" />
+                Dữ liệu trực tiếp từ Firebase
+              </span>
+              <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
+                Chỉ tài khoản của bạn xem được
+              </span>
+            </div>
           </div>
         )}
 

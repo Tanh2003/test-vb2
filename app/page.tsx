@@ -61,10 +61,11 @@ export default function HomePage() {
   }, []);
 
   const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
+  const currentUserEmail = candidate?.email || '';
 
   // 1. Tải đề thi CÁ NHÂN từ Firebase (của người nào người đó xem)
   const fetchUserExams = useCallback(async () => {
-    if (!currentUserId) {
+    if (!currentUserId && !currentUserEmail) {
       setUserExams([]);
       setIsLoadingUserExams(false);
       return;
@@ -72,7 +73,12 @@ export default function HomePage() {
 
     setIsLoadingUserExams(true);
     try {
-      const res = await fetch(`/api/exams?userId=${encodeURIComponent(currentUserId)}&userOnly=true`);
+      const params = new URLSearchParams();
+      params.set('userOnly', 'true');
+      if (currentUserId) params.set('userId', currentUserId);
+      if (currentUserEmail) params.set('email', currentUserEmail);
+
+      const res = await fetch(`/api/exams?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -89,7 +95,7 @@ export default function HomePage() {
     } finally {
       setIsLoadingUserExams(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, currentUserEmail]);
 
   // 2. Tải đề thi MIỄN PHÍ / CÔNG KHAI từ Firebase (do Admin tự đăng)
   const fetchPublicExams = useCallback(async () => {

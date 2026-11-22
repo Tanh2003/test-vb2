@@ -39,23 +39,6 @@ interface CandidateInfo {
   fullName?: string;
 }
 
-function saveToUserUploadedList(exam: any) {
-  if (!exam || !exam.id) return;
-  try {
-    const raw = localStorage.getItem('user_uploaded_exams_list');
-    const list: any[] = raw ? JSON.parse(raw) : [];
-    const index = list.findIndex((item) => item.id === exam.id);
-    if (index >= 0) {
-      list[index] = { ...list[index], ...exam };
-    } else {
-      list.unshift(exam);
-    }
-    localStorage.setItem('user_uploaded_exams_list', JSON.stringify(list));
-  } catch (e) {
-    console.error('Lỗi lưu user_uploaded_exams_list:', e);
-  }
-}
-
 function UploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -341,9 +324,6 @@ function UploadContent() {
         throw new Error(`Lỗi cập nhật CSDL Firebase (Status ${res.status})`);
       }
 
-      localStorage.setItem(`parsed_exam_${effectiveCa}`, JSON.stringify(payload));
-      localStorage.setItem(`exam_current_${savedExamId}`, JSON.stringify(payload));
-      saveToUserUploadedList(payload);
       setParsedData(payload);
       setIsDirty(false);
       setLastUpdatedTime(new Date().toLocaleTimeString('vi-VN'));
@@ -512,9 +492,6 @@ function UploadContent() {
         answerPdfName: answerPdfFileName,
       });
 
-      localStorage.setItem(`parsed_exam_${effectiveCa}`, JSON.stringify(payload));
-      localStorage.setItem(`exam_current_${examId}`, JSON.stringify(payload));
-      saveToUserUploadedList(payload);
       setSavedExamId(examId);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -685,7 +662,7 @@ function UploadContent() {
                 <div className="font-extrabold text-[#0f2d22] flex items-center gap-2">
                   <span>Tài khoản upload: {candidate.fullName || candidate.username || 'Thí sinh'}</span>
                   <span className="font-mono text-[11px] bg-emerald-200/80 text-emerald-950 font-bold px-2 py-0.5 rounded-lg">
-                    ID: {candidate.uid || candidate.id || candidate.sbd || candidate.email}
+                    ID: { candidate.sbd || candidate.email}
                   </span>
                 </div>
                 <p className="text-emerald-800/90 text-xs mt-0.5 font-medium">
@@ -991,10 +968,10 @@ function UploadContent() {
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
                 <div>
                   <label htmlFor="isPublicCheck" className="text-xs font-bold text-slate-800 block cursor-pointer">
-                    Đề thi công khai (Admin upload đề miễn phí)
+                    Đề thi công khai 
                   </label>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Tích chọn nếu bạn là Admin muốn mở đề miễn phí cho toàn bộ thí sinh. Nếu không chọn, đề thi được lưu riêng tư và chỉ tài khoản của bạn mới xem được.
+                    Tích chọn nếu bạn muốn mở đề miễn phí cho toàn bộ mọi người. Nếu không chọn, đề thi được lưu riêng tư và chỉ tài khoản của bạn mới xem được.
                   </p>
                 </div>
                 <input
@@ -1041,7 +1018,7 @@ function UploadContent() {
                 <div className="flex items-center justify-between">
                   <span>Quyền hiển thị:</span>
                   <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${isPublic ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-900'}`}>
-                    {isPublic ? 'Công khai (Admin)' : 'Riêng tư (Chỉ bạn)'}
+                    {isPublic ? 'Công khai (mọi người)' : 'Riêng tư (Chỉ bạn)'}
                   </span>
                 </div>
               </div>
