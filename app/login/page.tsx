@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import GoogleLoginButton from '@/components/GoogleLoginButton';
 import { Loader2 } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/';
+
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,8 +46,8 @@ export default function LoginPage() {
       // 2. Lưu hồ sơ thí sinh lấy trực tiếp từ Firebase vào LocalStorage
       localStorage.setItem('candidate_info', JSON.stringify(data.user));
 
-      // 3. Chuyển hướng về Trang chủ
-      router.push('/');
+      // 3. Chuyển hướng về trang yêu cầu (hoặc Trang chủ)
+      router.push(redirectUrl);
       router.refresh();
     } catch (err: any) {
       setError(err?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.');
@@ -107,8 +110,14 @@ export default function LoginPage() {
             Đăng nhập
           </h2>
 
+          {redirectUrl !== '/' && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 font-medium">
+              Vui lòng đăng nhập để tiếp tục truy cập tính năng upload đề thi.
+            </div>
+          )}
+
           {/* Nút Đăng nhập bằng Google */}
-          <GoogleLoginButton variant="light" redirectTo="/" />
+          <GoogleLoginButton variant="light" redirectTo={redirectUrl} />
 
           {/* Dòng phân cách */}
           <div className="my-6 text-center text-xs sm:text-sm text-slate-500 font-normal">
@@ -179,7 +188,7 @@ export default function LoginPage() {
           <div className="mt-6 text-center text-xs sm:text-sm text-slate-600">
             Chưa có tài khoản?{' '}
             <Link
-              href="/signup"
+              href={redirectUrl !== '/' ? `/signup?redirect=${encodeURIComponent(redirectUrl)}` : '/signup'}
               className="font-bold text-[#0f2d22] hover:underline cursor-pointer"
             >
               Đăng ký
@@ -188,5 +197,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#f7f8f7] flex items-center justify-center p-4 text-sm font-semibold text-slate-600">
+          Đang tải trang đăng nhập...
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

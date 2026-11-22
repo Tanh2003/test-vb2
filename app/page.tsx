@@ -211,25 +211,27 @@ export default function HomePage() {
             <Link href="/" className="text-white font-semibold underline underline-offset-4 decoration-amber-400">
               Thư viện đề
             </Link>
-            <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
-              Upload đề
-            </Link>
-            <Link href="/upload-history" className="text-emerald-100/80 hover:text-white transition">
-              Lịch sử upload
-            </Link>
             <Link href="/select-exam" className="text-emerald-100/80 hover:text-white transition">
               Ngân hàng đề thi
             </Link>
-            <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
-              Lịch sử làm đề
-            </Link>
             {candidate ? (
-              <Link
-                href="/profile"
-                className="text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-2 transition"
-              >
-                [{candidate.fullName || candidate.sbd || candidate.username || 'TÀI KHOẢN'}]
-              </Link>
+              <>
+                <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
+                  Upload đề
+                </Link>
+                <Link href="/upload-history" className="text-emerald-100/80 hover:text-white transition">
+                  Lịch sử upload
+                </Link>
+                <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
+                  Lịch sử làm đề
+                </Link>
+                <Link
+                  href="/profile"
+                  className="text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-2 transition"
+                >
+                  [{candidate.fullName || candidate.sbd || candidate.username || 'TÀI KHOẢN'}]
+                </Link>
+              </>
             ) : (
               <div className="flex items-center gap-2 sm:gap-3 pl-2">
                 <Link
@@ -264,7 +266,13 @@ export default function HomePage() {
           </div>
           <div>
             <button
-              onClick={() => router.push('/import')}
+              onClick={() => {
+                if (!candidate) {
+                  router.push('/login?redirect=/import');
+                } else {
+                  router.push('/import');
+                }
+              }}
               className="px-6 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] font-bold text-white text-sm shadow-md transition active:scale-[0.98] cursor-pointer flex items-center gap-2"
             >
               <Upload className="w-4 h-4" />
@@ -423,7 +431,14 @@ export default function HomePage() {
                           <span>Vào làm bài ngay</span>
                         </button>
                         <button
-                          onClick={() => router.push(`/import?ca=${pCode}`)}
+                          onClick={() => {
+                            const dest = `/import?ca=${pCode}`;
+                            if (!candidate) {
+                              router.push(`/login?redirect=${encodeURIComponent(dest)}`);
+                            } else {
+                              router.push(dest);
+                            }
+                          }}
                           className="px-3 py-3 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer"
                           title="Tải đề khác cho mã này"
                         >
@@ -455,7 +470,14 @@ export default function HomePage() {
 
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                   <button
-                    onClick={() => router.push(`/import${activeCaTab !== 'ALL' ? `?ca=${activeCaTab}` : ''}`)}
+                    onClick={() => {
+                      const dest = `/import${activeCaTab !== 'ALL' ? `?ca=${activeCaTab}` : ''}`;
+                      if (!candidate) {
+                        router.push(`/login?redirect=${encodeURIComponent(dest)}`);
+                      } else {
+                        router.push(dest);
+                      }
+                    }}
                     className="px-5 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-xs sm:text-sm shadow-sm flex items-center gap-2 cursor-pointer transition active:scale-[0.98]"
                   >
                     <Upload className="w-4 h-4" />
@@ -463,7 +485,7 @@ export default function HomePage() {
                   </button>
                   {!candidate && (
                     <Link
-                      href="/login"
+                      href="/login?redirect=/import"
                       className="px-5 py-2.5 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white font-bold text-xs sm:text-sm shadow-sm flex items-center gap-2 cursor-pointer transition"
                     >
                       Đăng nhập ngay
@@ -497,7 +519,14 @@ export default function HomePage() {
                       <p className="text-xs text-slate-500 mb-5 leading-relaxed">{ca.desc}</p>
                     </div>
                     <button
-                      onClick={() => router.push(`/import?ca=${ca.code}`)}
+                      onClick={() => {
+                        const dest = `/import?ca=${ca.code}`;
+                        if (!candidate) {
+                          router.push(`/login?redirect=${encodeURIComponent(dest)}`);
+                        } else {
+                          router.push(dest);
+                        }
+                      }}
                       className="w-full py-2.5 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white font-bold text-xs sm:text-sm shadow-xs transition active:scale-[0.98] cursor-pointer"
                     >
                       Upload đề {ca.code}

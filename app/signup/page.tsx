@@ -1,14 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/';
+
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -82,8 +85,8 @@ export default function SignupPage() {
 
       localStorage.setItem('candidate_info', JSON.stringify(userInfo));
 
-      // 4. Chuyển hướng tới Trang chủ
-      router.push('/');
+      // 4. Chuyển hướng tới trang yêu cầu (hoặc Trang chủ)
+      router.push(redirectUrl);
       router.refresh();
     } catch (err: any) {
       console.error('Signup error:', err);
@@ -146,6 +149,12 @@ export default function SignupPage() {
           <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0f2d22] mb-6">
             Đăng ký tài khoản
           </h2>
+
+          {redirectUrl !== '/' && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 font-medium">
+              Đăng ký tài khoản để bắt đầu lưu trữ và upload đề thi riêng của bạn.
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600 font-medium">
@@ -227,7 +236,7 @@ export default function SignupPage() {
           <div className="mt-6 text-center text-xs sm:text-sm text-slate-600">
             Đã có tài khoản?{' '}
             <Link
-              href="/login"
+              href={redirectUrl !== '/' ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : '/login'}
               className="font-bold text-[#0f2d22] hover:underline cursor-pointer"
             >
               Đăng nhập
@@ -236,5 +245,19 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#f7f8f7] flex items-center justify-center p-4 text-sm font-semibold text-slate-600">
+          Đang tải trang đăng ký...
+        </div>
+      }
+    >
+      <SignupForm />
+    </Suspense>
   );
 }

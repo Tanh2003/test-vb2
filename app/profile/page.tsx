@@ -67,9 +67,14 @@ export default function ProfilePage() {
           examCode: data.examCode || prev.examCode,
           freeUploadsRemaining: data.freeUploadsRemaining ?? 2,
         }));
+      } else {
+        router.replace('/login?redirect=/profile');
+        return;
       }
     } catch (e) {
       console.error(e);
+      router.replace('/login?redirect=/profile');
+      return;
     }
 
     // Đồng bộ trực tiếp dữ liệu mới nhất từ CSDL Firebase

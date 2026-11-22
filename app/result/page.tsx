@@ -332,21 +332,37 @@ function ResultContent() {
                 <span>Xem danh sách ({historyList.length})</span>
               </button>
             )}
+            <Link href="/" className="text-emerald-100/80 hover:text-white transition">
+              Thư viện đề
+            </Link>
             <Link
               href="/select-exam"
               className="text-emerald-100/80 hover:text-white transition"
             >
               Ngân hàng đề
             </Link>
-            <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
-              Upload đề
-            </Link>
-            <Link href="/upload-history" className="text-emerald-100/80 hover:text-white transition">
-              Lịch sử upload
-            </Link>
-            <Link href="/" className="text-emerald-100/80 hover:text-white transition">
-              Trang chủ
-            </Link>
+            {candidateId ? (
+              <>
+                <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
+                  Upload đề
+                </Link>
+                <Link href="/upload-history" className="text-emerald-100/80 hover:text-white transition">
+                  Lịch sử upload
+                </Link>
+                <Link href="/profile" className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs transition">
+                  [{candidateName || 'TÀI KHOẢN'}]
+                </Link>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link href="/login" className="text-amber-300 hover:text-amber-200 font-semibold text-xs sm:text-sm transition">
+                  Đăng nhập
+                </Link>
+                <Link href="/signup" className="px-3 py-1 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-xs transition">
+                  Đăng ký
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </header>

@@ -84,18 +84,23 @@ function UploadHistoryContent() {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // Load candidate info
+  // Load candidate info - Yêu cầu đăng nhập mới xem được lịch sử upload
   useEffect(() => {
     try {
       const stored = localStorage.getItem('candidate_info');
       if (stored) {
         setCandidate(JSON.parse(stored));
+        setIsCheckingAuth(false);
+      } else {
+        router.replace('/login?redirect=/upload-history');
       }
     } catch (e) {
       console.error(e);
+      router.replace('/login?redirect=/upload-history');
     }
-  }, []);
+  }, [router]);
 
   const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
 
@@ -240,6 +245,24 @@ function UploadHistoryContent() {
     return { total, ca1, ca2, ca3, ca4, withPdf };
   }, [exams]);
 
+  if (isCheckingAuth || !candidate) {
+    return (
+      <div className="min-h-screen bg-[#f7f8f7] flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-200 shadow-sm text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Yêu cầu đăng nhập</h3>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Vui lòng đăng nhập để xem lịch sử các đề thi bạn đã upload. Đang chuyển hướng đến trang đăng nhập...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f7f8f7] text-slate-800 font-sans flex flex-col justify-between">
       {/* 1. HEADER CHUẨN XANH RÊU CAND */}
@@ -275,28 +298,30 @@ function UploadHistoryContent() {
             <Link href="/" className="text-emerald-100/80 hover:text-white transition">
               Thư viện đề
             </Link>
-            <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
-              Upload đề
-            </Link>
-            <Link
-              href="/upload-history"
-              className="text-white font-semibold underline underline-offset-4 decoration-amber-400"
-            >
-              Lịch sử upload
-            </Link>
             <Link href="/select-exam" className="text-emerald-100/80 hover:text-white transition">
               Ngân hàng đề thi
             </Link>
-            <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
-              Lịch sử làm đề
-            </Link>
             {candidate ? (
-              <Link
-                href="/profile"
-                className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs sm:text-sm pl-2 transition"
-              >
-                [{candidate.fullName || candidate.sbd || candidate.username || 'TÀI KHOẢN'}]
-              </Link>
+              <>
+                <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
+                  Upload đề
+                </Link>
+                <Link
+                  href="/upload-history"
+                  className="text-white font-semibold underline underline-offset-4 decoration-amber-400"
+                >
+                  Lịch sử upload
+                </Link>
+                <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
+                  Lịch sử làm đề
+                </Link>
+                <Link
+                  href="/profile"
+                  className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs sm:text-sm pl-2 transition"
+                >
+                  [{candidate.fullName || candidate.sbd || candidate.username || 'TÀI KHOẢN'}]
+                </Link>
+              </>
             ) : (
               <div className="flex items-center gap-2 sm:gap-3 pl-2">
                 <Link
