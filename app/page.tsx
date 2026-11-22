@@ -1,25 +1,54 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Upload, BookOpen, Clock, FileText } from 'lucide-react';
+import {
+  Upload,
+  Clock,
+  FileText,
+  AlertCircle,
+  PlayCircle,
+  Sparkles,
+} from 'lucide-react';
+import { PaperCode, PAPER_META } from '@/types/exam';
 
 interface Candidate {
   fullName?: string;
   username?: string;
   sbd?: string;
   email?: string;
+  uid?: string;
+  id?: string;
+}
+
+interface ExamDoc {
+  id: string;
+  title: string;
+  paperCode: string;
+  examCode: string;
+  subject?: string;
+  totalQuestions?: number;
+  duration?: number;
+  durationMinutes?: number;
+  ownerId?: string;
+  userId?: string;
+  ownerName?: string;
+  isPublic?: boolean;
 }
 
 export default function HomePage() {
   const router = useRouter();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [userExams, setUserExams] = useState<ExamDoc[]>([]);
+  const [publicExams, setPublicExams] = useState<ExamDoc[]>([]);
+  const [isLoadingUserExams, setIsLoadingUserExams] = useState(true);
+  const [isLoadingPublicExams, setIsLoadingPublicExams] = useState(true);
   const [activeCaTab, setActiveCaTab] = useState<'ALL' | 'CA1' | 'CA2' | 'CA3' | 'CA4'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [sourceFilter, setSourceFilter] = useState<'ALL' | 'FREE' | 'USER'>('ALL');
 
+  // Load candidate info từ localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem('candidate_info');
@@ -31,59 +60,119 @@ export default function HomePage() {
     }
   }, []);
 
-  const freeExams = [
-    {
-      id: 'CA1',
-      title: 'Đề minh hoạ CA1 - Tự luận & Toán cao cấp',
-      meta: 'CA1 · 50 câu · 150 phút',
-      tag: 'Miễn phí',
-    },
-    {
-      id: 'CA2',
-      title: 'Đề minh hoạ CA2 - Tự luận & Kinh tế vĩ mô',
-      meta: 'CA2 · 50 câu · 150 phút',
-      tag: 'Miễn phí',
-    },
-    {
-      id: 'CA3',
-      title: 'Đề minh hoạ CA3 - Tự luận & Triết học Mác - Lênin',
-      meta: 'CA3 · 60 câu · 150 phút',
-      tag: 'Miễn phí',
-    },
-    {
-      id: 'CA4',
-      title: 'Đề minh hoạ CA4 - Tự luận & Nhà nước và pháp luật',
-      meta: 'CA4 · 60 câu · 150 phút',
-      tag: 'Miễn phí',
-    },
-  ];
+  const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
+
+  // 1. Tải đề thi CÁ NHÂN từ Firebase (của người nào người đó xem)
+  const fetchUserExams = useCallback(async () => {
+    if (!currentUserId) {
+      setUserExams([]);
+      setIsLoadingUserExams(false);
+      return;
+    }
+
+    setIsLoadingUserExams(true);
+    try {
+      const res = await fetch(`/api/exams?userId=${encodeURIComponent(currentUserId)}&userOnly=true`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setUserExams(data);
+        } else {
+          setUserExams([]);
+        }
+      } else {
+        setUserExams([]);
+      }
+    } catch (err) {
+      console.error('Lỗi lấy đề thi cá nhân:', err);
+      setUserExams([]);
+    } finally {
+      setIsLoadingUserExams(false);
+    }
+  }, [currentUserId]);
+
+  // 2. Tải đề thi MIỄN PHÍ / CÔNG KHAI từ Firebase (do Admin tự đăng)
+  const fetchPublicExams = useCallback(async () => {
+    setIsLoadingPublicExams(true);
+    try {
+      const res = await fetch('/api/exams?isPublic=true');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setPublicExams(data);
+        } else {
+          setPublicExams([]);
+        }
+      } else {
+        setPublicExams([]);
+      }
+    } catch (err) {
+      console.error('Lỗi lấy đề thi công khai:', err);
+      setPublicExams([]);
+    } finally {
+      setIsLoadingPublicExams(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUserExams();
+    fetchPublicExams();
+  }, [fetchUserExams, fetchPublicExams]);
 
   const caCategories = [
     {
-      code: 'CA1',
+      code: 'CA1' as PaperCode,
       subject: 'Toán cao cấp',
       desc: 'Tự luận Xã hội (30đ) & Toán cao cấp (70đ: 45 trắc nghiệm + 5 trả lời ngắn)',
-      count: 1,
     },
     {
-      code: 'CA2',
+      code: 'CA2' as PaperCode,
       subject: 'Kinh tế vĩ mô',
       desc: 'Tự luận Xã hội (30đ) & Kinh tế vĩ mô (70đ: 45 trắc nghiệm + 5 trả lời ngắn)',
-      count: 1,
     },
     {
-      code: 'CA3',
+      code: 'CA3' as PaperCode,
       subject: 'Triết học Mác - Lênin',
       desc: 'Tự luận Xã hội (30đ) & Triết học Mác - Lênin (70đ: 54 trắc nghiệm + 6 điền khuyết)',
-      count: 1,
     },
     {
-      code: 'CA4',
+      code: 'CA4' as PaperCode,
       subject: 'Nhà nước và pháp luật',
       desc: 'Tự luận Xã hội (30đ) & Nhà nước và pháp luật (70đ: 54 trắc nghiệm + 6 tình huống)',
-      count: 1,
     },
   ];
+
+  // Lọc đề của bạn theo mã Ca và tìm kiếm
+  const filteredUserExams = userExams.filter((exam) => {
+    if (activeCaTab !== 'ALL') {
+      const code = (exam.paperCode || exam.examCode)?.toUpperCase();
+      if (code !== activeCaTab) return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = exam.title?.toLowerCase().includes(q);
+      const matchSubj = exam.subject?.toLowerCase().includes(q);
+      const matchCode = (exam.paperCode || exam.examCode)?.toLowerCase().includes(q);
+      if (!matchTitle && !matchSubj && !matchCode) return false;
+    }
+    return true;
+  });
+
+  // Lọc đề công khai
+  const filteredPublicExams = publicExams.filter((exam) => {
+    if (activeCaTab !== 'ALL') {
+      const code = (exam.paperCode || exam.examCode)?.toUpperCase();
+      if (code !== activeCaTab) return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = exam.title?.toLowerCase().includes(q);
+      const matchSubj = exam.subject?.toLowerCase().includes(q);
+      const matchCode = (exam.paperCode || exam.examCode)?.toLowerCase().includes(q);
+      if (!matchTitle && !matchSubj && !matchCode) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-[#f7f8f7] text-slate-800 font-sans flex flex-col justify-between">
@@ -112,7 +201,7 @@ export default function HomePage() {
                 THI ONLINE VB2
               </div>
               <div className="text-[11px] text-slate-200/90 font-medium">
-                Văn bằng 2 Công an
+                Văn bằng 2 Công an nhân dân
               </div>
             </div>
           </Link>
@@ -124,6 +213,9 @@ export default function HomePage() {
             </Link>
             <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
               Upload đề
+            </Link>
+            <Link href="/select-exam" className="text-emerald-100/80 hover:text-white transition">
+              Ngân hàng đề thi
             </Link>
             <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
               Lịch sử làm đề
@@ -158,21 +250,22 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <div className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-1">
-              VĂN BẰNG 2 · CÔNG AN
+              VĂN BẰNG 2 &bull; CÔNG AN NHÂN DÂN
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">
               Thư viện đề của bạn
             </h1>
             <p className="text-xs sm:text-sm text-emerald-100/80">
-              Làm thử bộ đề miễn phí hoặc tải đề PDF của bạn lên để làm online.
+              Hệ thống lưu trữ đề thi cá nhân bảo mật theo từng tài khoản và ngân hàng đề thi chuẩn Bộ Công An.
             </p>
           </div>
           <div>
             <button
               onClick={() => router.push('/import')}
-              className="px-6 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] font-bold text-white text-sm shadow-md shadow-red-950/30 transition active:scale-[0.98] cursor-pointer"
+              className="px-6 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] font-bold text-white text-sm shadow-md transition active:scale-[0.98] cursor-pointer flex items-center gap-2"
             >
-              Upload đề
+              <Upload className="w-4 h-4" />
+              <span>Upload đề mới</span>
             </button>
           </div>
         </div>
@@ -180,11 +273,6 @@ export default function HomePage() {
 
       {/* 2. BODY CONTENT (BACKGROUND SÁNG) */}
       <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8 flex-1">
-        {/* Notice Banner */}
-        <div className="bg-[#fffbeb] border border-amber-200/90 rounded-2xl p-4 text-xs sm:text-sm text-amber-900 font-medium">
-          Bạn còn 2/2 lượt tải đề miễn phí. Từ lần thứ 3, phí [PHÍ] đ cho mỗi đề.
-        </div>
-
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           <div className="md:col-span-6">
@@ -193,6 +281,7 @@ export default function HomePage() {
             </label>
             <input
               type="text"
+              placeholder="Nhập tên đề thi, mã đề CA1 - CA4..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22] transition"
@@ -204,129 +293,294 @@ export default function HomePage() {
             </label>
             <select
               value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
+              onChange={(e) => setSourceFilter(e.target.value as any)}
               className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22] transition"
             >
               <option value="ALL">Tất cả</option>
-              <option value="FREE">Bộ đề miễn phí</option>
               <option value="USER">Đề của bạn</option>
+              <option value="FREE">Đề miễn phí (Admin)</option>
             </select>
           </div>
           <div className="md:col-span-3">
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Trạng thái
+              Mã ca thi
             </label>
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              value={activeCaTab}
+              onChange={(e) => setActiveCaTab(e.target.value as any)}
               className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-[#0f2d22] transition"
             >
-              <option value="ALL">Tất cả</option>
-              <option value="TODO">Chưa làm</option>
-              <option value="DONE">Đã hoàn thành</option>
+              <option value="ALL">Tất cả các ca</option>
+              <option value="CA1">CA1 - Toán cao cấp</option>
+              <option value="CA2">CA2 - Kinh tế vĩ mô</option>
+              <option value="CA3">CA3 - Triết học Mác - Lênin</option>
+              <option value="CA4">CA4 - Nhà nước và pháp luật</option>
             </select>
           </div>
         </div>
 
-        {/* Section 1: Bộ đề miễn phí */}
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4">
-            Bộ đề miễn phí
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {freeExams.map((exam) => (
-              <div
-                key={exam.id}
-                className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="text-base font-bold text-slate-900 leading-snug">
-                      {exam.title}
-                    </h3>
-                    <span className="shrink-0 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                      {exam.tag}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mb-6">{exam.meta}</p>
+        {/* SECTION 2: ĐỀ CỦA BẠN (Dữ liệu thực tế từ Firebase) */}
+        {(sourceFilter === 'ALL' || sourceFilter === 'USER') && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-[#0f2d22]">
+                    Đề của bạn
+                  </h2>
+                  <span className="text-xs font-black text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full">
+                    {userExams.length} đề thi
+                  </span>
                 </div>
-                <button
-                  onClick={() => router.push(`/exam?ca=${exam.id}`)}
-                  className="w-full py-2.5 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white font-semibold text-sm transition active:scale-[0.98] cursor-pointer"
-                >
-                  Làm bài
-                </button>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {candidate
+                    ? `Danh sách đề thi do tài khoản ${candidate.fullName || candidate.username || 'của bạn'} upload lên Firebase`
+                    : 'Đăng nhập để xem danh sách các đề thi bạn đã upload độc quyền'}
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Section 2: Đề của bạn */}
-        <div className="space-y-4">
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-            Đề của bạn
-          </h2>
+              {/* Ca Tabs Filter */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                {(['ALL', 'CA1', 'CA2', 'CA3', 'CA4'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveCaTab(tab)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      activeCaTab === tab
+                        ? 'bg-[#0f2d22] text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {tab === 'ALL' ? 'Tất cả' : tab}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* Ca Tabs Filter */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
-            {(['ALL', 'CA1', 'CA2', 'CA3', 'CA4'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveCaTab(tab)}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
-                  activeCaTab === tab
-                    ? 'bg-[#0f2d22] text-white'
-                    : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                {tab === 'ALL' ? 'Tất cả' : tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Empty State Banner */}
-          <div className="bg-white rounded-2xl p-10 border border-slate-200/80 shadow-sm text-center">
-            <h3 className="text-base font-bold text-slate-800 mb-1">
-              Bạn chưa có đề nào
-            </h3>
-            <p className="text-xs text-slate-500">
-              Chọn ca bên dưới để upload đề PDF đầu tiên.
-            </p>
-          </div>
-
-          {/* 4 Ca Upload Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {caCategories.map((ca) => (
-              <div
-                key={ca.code}
-                className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-bold text-slate-900">
-                      {ca.code} &bull; {ca.subject}
-                    </span>
-                    <span className="text-xs text-slate-400 font-medium">
-                      {ca.count} đề
-                    </span>
+            {/* Trạng thái Loading hoặc Danh sách đề của bạn */}
+            {isLoadingUserExams ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {[1, 2].map((i) => (
+                  <div key={i} className="bg-white rounded-3xl p-6 border border-slate-200 animate-pulse space-y-3">
+                    <div className="h-5 bg-slate-200 rounded w-1/3" />
+                    <div className="h-6 bg-slate-200 rounded w-3/4" />
+                    <div className="h-4 bg-slate-200 rounded w-1/2" />
+                    <div className="h-10 bg-slate-200 rounded-xl w-full pt-2" />
                   </div>
-                  <p className="text-xs text-slate-500 mb-5">{ca.desc}</p>
-                </div>
-                <button
-                  onClick={() => router.push(`/import?ca=${ca.code}`)}
-                  className="w-full py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-semibold text-xs sm:text-sm shadow-sm transition active:scale-[0.98] cursor-pointer"
-                >
-                  Upload đề {ca.code}
-                </button>
+                ))}
               </div>
-            ))}
+            ) : filteredUserExams.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredUserExams.map((exam) => {
+                  const pCode = ((exam.paperCode || exam.examCode || 'CA1') as string).toUpperCase() as PaperCode;
+                  const subjectName = exam.subject || PAPER_META[pCode]?.subject || 'Môn thi chuyên ngành';
+
+                  return (
+                    <div
+                      key={exam.id}
+                      className="group bg-white rounded-3xl p-6 border-2 border-amber-300 ring-2 ring-amber-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-200"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black px-3 py-1 rounded-xl bg-[#0f2d22] text-amber-300 shadow-2xs tracking-wider">
+                            MÃ ĐỀ: {pCode}
+                          </span>
+                          <span className="flex items-center gap-1 text-[11px] font-extrabold text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-full">
+                            ⭐ Đề của bạn
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                            {subjectName}
+                          </span>
+                          <h3 className="text-base font-extrabold text-slate-900 group-hover:text-emerald-900 leading-snug line-clamp-2 mt-0.5">
+                            {exam.title}
+                          </h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
+                          <div className="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200/80 font-semibold">
+                            <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>{exam.duration || exam.durationMinutes || 150} Phút</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200/80 font-semibold">
+                            <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span>{exam.totalQuestions || 50} Câu hỏi</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex items-center gap-2">
+                        <button
+                          onClick={() => router.push(`/exam?id=${exam.id}&ca=${pCode}`)}
+                          className="flex-1 py-3 px-4 bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer active:scale-[0.98]"
+                        >
+                          <PlayCircle className="w-4 h-4" />
+                          <span>Vào làm bài ngay</span>
+                        </button>
+                        <button
+                          onClick={() => router.push(`/import?ca=${pCode}`)}
+                          className="px-3 py-3 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer"
+                          title="Tải đề khác cho mã này"
+                        >
+                          Upload lại
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Khối Banner khi chưa có đề thi */
+              <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-sm text-center space-y-4">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1">
+                    {activeCaTab === 'ALL'
+                      ? 'Bạn chưa có đề nào trong mục Đề của bạn'
+                      : `Bạn chưa upload đề thi nào cho mã ${activeCaTab} (${PAPER_META[activeCaTab]?.subject || ''})`}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
+                    {candidate
+                      ? 'Tải lên file đề PDF của bạn để bắt đầu làm bài trực tuyến.'
+                      : 'Hãy đăng nhập để lưu trữ và quản lý các đề thi cá nhân của bạn.'}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => router.push(`/import${activeCaTab !== 'ALL' ? `?ca=${activeCaTab}` : ''}`)}
+                    className="px-5 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-xs sm:text-sm shadow-sm flex items-center gap-2 cursor-pointer transition active:scale-[0.98]"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>Upload đề PDF {activeCaTab !== 'ALL' ? activeCaTab : ''}</span>
+                  </button>
+                  {!candidate && (
+                    <Link
+                      href="/login"
+                      className="px-5 py-2.5 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white font-bold text-xs sm:text-sm shadow-sm flex items-center gap-2 cursor-pointer transition"
+                    >
+                      Đăng nhập ngay
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 4 Ca Upload Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+              {caCategories.map((ca) => {
+                const count = userExams.filter(
+                  (e) => (e.paperCode || e.examCode)?.toUpperCase() === ca.code
+                ).length;
+
+                return (
+                  <div
+                    key={ca.code}
+                    className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm flex flex-col justify-between hover:border-slate-300 transition"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-extrabold text-slate-900">
+                          {ca.code} &bull; {ca.subject}
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          {count > 0 ? `${count} đề của bạn` : '0 đề'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-5 leading-relaxed">{ca.desc}</p>
+                    </div>
+                    <button
+                      onClick={() => router.push(`/import?ca=${ca.code}`)}
+                      className="w-full py-2.5 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white font-bold text-xs sm:text-sm shadow-xs transition active:scale-[0.98] cursor-pointer"
+                    >
+                      Upload đề {ca.code}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* SECTION 1: BỘ ĐỀ MIỄN PHÍ (Chỉ hiển thị đề công khai do Admin đăng lên Firebase) */}
+        {(sourceFilter === 'ALL' || sourceFilter === 'FREE') && (
+          <div className="space-y-4 pt-4 border-t border-slate-200/80">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                  Bộ đề miễn phí (Đề công khai do Admin đăng)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Các đề thi chuẩn được Ban Quản trị đăng tải công khai cho toàn bộ thí sinh
+                </p>
+              </div>
+              <Link
+                href="/select-exam"
+                className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline"
+              >
+                Xem tất cả ngân hàng đề &rarr;
+              </Link>
+            </div>
+
+            {isLoadingPublicExams ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {[1, 2].map((i) => (
+                  <div key={i} className="bg-white rounded-3xl p-6 border border-slate-200 animate-pulse space-y-3">
+                    <div className="h-5 bg-slate-200 rounded w-1/3" />
+                    <div className="h-6 bg-slate-200 rounded w-3/4" />
+                    <div className="h-4 bg-slate-200 rounded w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredPublicExams.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {filteredPublicExams.map((exam) => {
+                  const pCode = ((exam.paperCode || exam.examCode || 'CA1') as string).toUpperCase();
+                  return (
+                    <div
+                      key={exam.id}
+                      className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex flex-col justify-between hover:shadow-md transition"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="text-sm font-extrabold text-slate-900 leading-snug line-clamp-2">
+                            {exam.title}
+                          </h3>
+                          <span className="shrink-0 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            Miễn phí
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-6">
+                          {pCode} &bull; {exam.totalQuestions || 50} câu &bull; {exam.duration || 150} phút
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => router.push(`/exam?id=${exam.id}&ca=${pCode}`)}
+                        className="w-full py-2.5 rounded-xl bg-[#0f2d22] hover:bg-[#184232] text-white font-bold text-sm transition active:scale-[0.98] cursor-pointer"
+                      >
+                        Làm bài ngay
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl p-8 border border-slate-200 text-center text-xs sm:text-sm text-slate-500 space-y-1">
+                <p className="font-semibold text-slate-700">Chưa có đề thi mẫu công khai nào.</p>
+                <p>Các bộ đề thi chuẩn sẽ được Ban Quản trị cập nhật trực tiếp lên hệ thống.</p>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* 3. FOOTER */}
       <footer className="bg-[#0a2018] text-emerald-100/60 text-xs py-6 px-4 text-center mt-12 border-t border-emerald-950">
-        [THÔNG TIN LIÊN HỆ / HỖ TRỢ]
+        Hệ Thống Luyện Thi Trực Tuyến Tuyển Sinh Văn Bằng 2 Công An Nhân Dân &bull; Chuẩn hoá cấu trúc 4 mã đề CA1 - CA2 - CA3 - CA4
       </footer>
     </div>
   );

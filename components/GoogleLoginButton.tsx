@@ -42,12 +42,17 @@ export default function GoogleLoginButton({
         throw new Error(errorData.error || 'Đăng nhập máy chủ thất bại.');
       }
 
+      const loginData = await response.json().catch(() => ({}));
+
       localStorage.setItem(
         'candidate_info',
         JSON.stringify({
-          sbd: result.user.email?.split('@')[0].toUpperCase() || 'CAND-USER',
-          fullName: result.user.displayName || 'ĐỒNG CHÍ THÍ SINH',
+          uid: result.user.uid,
+          id: result.user.uid,
+          sbd: loginData.user?.sbd || result.user.email?.split('@')[0].toUpperCase() || 'CAND-USER',
+          fullName: loginData.user?.fullName || result.user.displayName || 'ĐỒNG CHÍ THÍ SINH',
           email: result.user.email || '',
+          username: loginData.user?.username || result.user.email?.split('@')[0] || '',
           examCode: 'CA1',
         })
       );

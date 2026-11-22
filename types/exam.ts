@@ -157,7 +157,11 @@ export type ExamStatus = 'draft' | 'needs_review' | 'published' | 'archived';
 
 export interface ExamDoc {
   id: string;
-  ownerId?: string;
+  ownerId?: string;                  // ID tài khoản người tạo (uid/sbd/email)
+  userId?: string;                   // ID tài khoản người tạo
+  ownerName?: string;                // Họ tên người upload
+  ownerEmail?: string;               // Email người upload
+  isPublic?: boolean;                // Đề công khai hay riêng tư
   title: string;
   year: number;
   durationMinutes: number;
@@ -173,6 +177,9 @@ export interface PaperDoc {
   examId: string;
   paperCode: PaperCode;
   ownerId?: string;
+  userId?: string;
+  ownerName?: string;
+  ownerEmail?: string;
   subject: string;
   status: ExamStatus;
   essay: { prompt: RichText; citation?: string; minWords: number; maxPoints: number; rubric?: RichText };
@@ -292,4 +299,45 @@ export interface GradingResult {
   priorityPoints: PriorityPoints;
   totalBonusPoints: number;
   admissionScore: number;
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * 6. KẾT QUẢ NỘP BÀI & BẢNG ĐIỂM CHI TIẾT
+ * ════════════════════════════════════════════════════════════════ */
+
+export interface SubmissionDetail {
+  questionNumber: number;
+  type: QuestionType;
+  stem: string;
+  options?: { key: OptionKey; text: string }[];
+  userAnswer: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+  explanation?: string;
+}
+
+export interface SubmissionResult {
+  id: string;
+  examId: string;
+  paperCode: PaperCode;
+  subject: string;
+  examTitle: string;
+  candidateId: string;
+  candidateName: string;
+  sbd: string;
+  submittedAt: string;
+  timeSpentSeconds: number;
+  durationMinutes: number;
+  totalScore: number;
+  objectiveScore: number;
+  essayScore: number;
+  classification: string;
+  totalQuestions: number;
+  correctCount: number;
+  incorrectCount: number;
+  unansweredCount: number;
+  essayWordCount: number;
+  essayFeedback: string;
+  essayText: string;
+  details: SubmissionDetail[];
 }

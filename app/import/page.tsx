@@ -21,7 +21,32 @@ import {
 } from 'lucide-react';
 import { ParsedExamPreview, ParsedData } from '@/components/admin/ParsedExamPreview';
 import { PaperCode, PAPER_META } from '@/types/exam';
-import { SAMPLES_BY_CODE } from '@/mock/mock-samples';
+
+interface CandidateInfo {
+  uid?: string;
+  id?: string;
+  email?: string;
+  sbd?: string;
+  username?: string;
+  fullName?: string;
+}
+
+function saveToUserUploadedList(exam: any) {
+  if (!exam || !exam.id) return;
+  try {
+    const raw = localStorage.getItem('user_uploaded_exams_list');
+    const list: any[] = raw ? JSON.parse(raw) : [];
+    const index = list.findIndex((item) => item.id === exam.id);
+    if (index >= 0) {
+      list[index] = { ...list[index], ...exam };
+    } else {
+      list.unshift(exam);
+    }
+    localStorage.setItem('user_uploaded_exams_list', JSON.stringify(list));
+  } catch (e) {
+    console.error('Lỗi lưu user_uploaded_exams_list:', e);
+  }
+}
 
 function UploadContent() {
   const router = useRouter();
@@ -38,9 +63,10 @@ function UploadContent() {
   const [answerFile, setAnswerFile] = useState<File | null>(null);
 
   const [examTitle, setExamTitle] = useState(
-    `Đề thi thử ${initialCa} - ${PAPER_META[initialCa]?.subject || ''} Bộ Công An 2026`
+    `Đề thi ${initialCa} - ${PAPER_META[initialCa]?.subject || ''} Bộ Công An 2026`
   );
   const [examDuration, setExamDuration] = useState('150');
+  const [isPublic, setIsPublic] = useState(false);
 
   const [isParsing, setIsParsing] = useState(false);
   const [parsingStep, setParsingStep] = useState<string>('');
@@ -48,7 +74,7 @@ function UploadContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [savedExamId, setSavedExamId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [candidate, setCandidate] = useState<{ fullName?: string; sbd?: string; username?: string } | null>(null);
+  const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
 
   // Load candidate info from localStorage
   useEffect(() => {
@@ -65,19 +91,7 @@ function UploadContent() {
   // Update default title when selectedCa changes
   const handleSelectCa = (ca: PaperCode) => {
     setSelectedCa(ca);
-    setExamTitle(`Đề thi thử ${ca} - ${PAPER_META[ca]?.subject || ''} Bộ Công An 2026`);
-    setErrorMessage(null);
-  };
-
-  // Quick load sample data
-  const handleLoadSample = (ca: PaperCode) => {
-    setSelectedCa(ca);
-    const sample = SAMPLES_BY_CODE[ca] || SAMPLES_BY_CODE.CA1;
-    const cloned = JSON.parse(JSON.stringify(sample));
-    setParsedData(cloned);
-    setExamTitle(cloned.examTitle || `Đề thi thử ${ca} - ${PAPER_META[ca]?.subject || ''} 2026`);
-    setExamDuration(String(cloned.durationMinutes || 150));
-    setSavedExamId(null);
+    setExamTitle(`Đề thi ${ca} - ${PAPER_META[ca]?.subject || ''} Bộ Công An 2026`);
     setErrorMessage(null);
   };
 
@@ -110,7 +124,7 @@ function UploadContent() {
 
   // Submit and call Gemini extraction API
   const handleSubmit = async () => {
-    if (!examFile && !parsedData) {
+    if (!examFile) {
       alert('Vui lòng chọn hoặc kéo thả file đề thi PDF!');
       return;
     }
@@ -120,12 +134,23 @@ function UploadContent() {
     setParsingStep('Đang tải tệp PDF lên máy chủ...');
 
     try {
+      const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
+      const currentUserName = candidate?.fullName || candidate?.username || candidate?.sbd || '';
+      const currentUserEmail = candidate?.email || '';
+
       const formData = new FormData();
-      if (examFile) formData.append('file', examFile);
+      formData.append('file', examFile);
       if (answerFile) formData.append('answerFile', answerFile);
       formData.append('paperCode', selectedCa);
       formData.append('examTitle', examTitle);
       formData.append('durationMinutes', examDuration);
+      formData.append('isPublic', String(isPublic));
+      if (currentUserId) {
+        formData.append('ownerId', currentUserId);
+        formData.append('userId', currentUserId);
+        formData.append('ownerName', currentUserName);
+        formData.append('ownerEmail', currentUserEmail);
+      }
 
       setParsingStep('AI Gemini đang phân tích thị giác và bóc tách cấu trúc 4 dạng câu...');
 
@@ -135,25 +160,42 @@ function UploadContent() {
       });
 
       if (!res.ok) {
-        throw new Error(`Máy chủ trả về mã lỗi: ${res.status}`);
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Máy chủ trả về mã lỗi: ${res.status}`);
       }
 
       setParsingStep('Đang chuẩn hóa công thức LaTeX và kiểm tra tính toàn vẹn...');
       const data = await res.json();
 
-      setParsedData(data);
-      if (data.id) {
-        setSavedExamId(data.id);
-      }
-    } catch (err: any) {
-      console.warn('Lỗi gọi API AI, nạp dữ liệu mẫu dự phòng:', err?.message || err);
-      // Fallback thông minh: Dùng mẫu chuẩn hóa của chính mã đề đang chọn
-      const fallback = JSON.parse(JSON.stringify(SAMPLES_BY_CODE[selectedCa] || SAMPLES_BY_CODE.CA1));
-      fallback.warnings = [
-        ...(fallback.warnings || []),
-        'Lưu ý: Không thể kết nối tới mô hình AI (hết hạn mức hoặc không phản hồi). Đã nạp mẫu chuẩn cấu trúc của đề ' + selectedCa + ' để bạn tiếp tục kiểm thử.',
-      ];
-      setParsedData(fallback);
+      const examId = data.id || `${selectedCa.toLowerCase()}_${Date.now()}`;
+      const examPayload = {
+        ...data,
+        id: examId,
+        paperCode: selectedCa,
+        examCode: selectedCa,
+        subject: PAPER_META[selectedCa]?.subject || '',
+        title: examTitle || data.examTitle || `Đề thi ${selectedCa}`,
+        duration: parseInt(examDuration, 10) || 150,
+        durationMinutes: parseInt(examDuration, 10) || 150,
+        ownerId: currentUserId || data.ownerId || 'anonymous',
+        userId: currentUserId || data.userId || 'anonymous',
+        ownerName: currentUserName || data.ownerName || '',
+        ownerEmail: currentUserEmail || data.ownerEmail || '',
+        isPublic,
+      };
+
+      setParsedData(examPayload);
+      setSavedExamId(examId);
+
+      // Lưu vào localStorage phục vụ làm bài tức thì
+      localStorage.setItem(`parsed_exam_${selectedCa}`, JSON.stringify(examPayload));
+      localStorage.setItem(`exam_current_${examId}`, JSON.stringify(examPayload));
+      saveToUserUploadedList(examPayload);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Lỗi gọi API AI:', msg);
+      setErrorMessage(`Không thể bóc tách đề: ${msg}. Vui lòng kiểm tra lại file PDF.`);
+      setParsedData(null);
     } finally {
       setIsParsing(false);
       setParsingStep('');
@@ -164,7 +206,12 @@ function UploadContent() {
   const handleSaveToDb = async () => {
     if (!parsedData) return;
     setIsSaving(true);
+    setErrorMessage(null);
     try {
+      const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
+      const currentUserName = candidate?.fullName || candidate?.username || candidate?.sbd || '';
+      const currentUserEmail = candidate?.email || '';
+
       const examId = savedExamId || `${selectedCa.toLowerCase()}_${Date.now()}`;
       const payload = {
         ...parsedData,
@@ -175,20 +222,31 @@ function UploadContent() {
         title: examTitle || parsedData.examTitle || `Đề thi ${selectedCa}`,
         duration: parseInt(examDuration, 10) || 150,
         durationMinutes: parseInt(examDuration, 10) || 150,
+        ownerId: currentUserId || parsedData.ownerId || 'anonymous',
+        userId: currentUserId || parsedData.userId || 'anonymous',
+        ownerName: currentUserName || parsedData.ownerName || '',
+        ownerEmail: currentUserEmail || parsedData.ownerEmail || '',
+        isPublic,
       };
 
-      await fetch('/api/exams', {
+      const res = await fetch('/api/exams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
+      if (!res.ok) {
+        throw new Error(`Lỗi lưu vào CSDL Firebase (Status ${res.status})`);
+      }
+
       localStorage.setItem(`parsed_exam_${selectedCa}`, JSON.stringify(payload));
       localStorage.setItem(`exam_current_${examId}`, JSON.stringify(payload));
+      saveToUserUploadedList(payload);
       setSavedExamId(examId);
-    } catch (e) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.error(e);
-      localStorage.setItem(`parsed_exam_${selectedCa}`, JSON.stringify(parsedData));
+      setErrorMessage(`Lỗi lưu đề thi: ${msg}`);
     } finally {
       setIsSaving(false);
     }
@@ -319,6 +377,51 @@ function UploadContent() {
           </span>
         </div>
 
+        {/* Khối Thông tin Tài khoản Sở Hữu Đề Thi */}
+        {candidate ? (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#0f2d22] text-amber-300 font-extrabold flex items-center justify-center shrink-0 shadow-xs">
+                {(candidate.fullName || candidate.username || 'U')[0].toUpperCase()}
+              </div>
+              <div>
+                <div className="font-extrabold text-[#0f2d22] flex items-center gap-2">
+                  <span>Tài khoản upload: {candidate.fullName || candidate.username || 'Thí sinh'}</span>
+                  <span className="font-mono text-[11px] bg-emerald-200/80 text-emerald-950 font-bold px-2 py-0.5 rounded-lg">
+                    ID: {candidate.uid || candidate.id || candidate.sbd || candidate.email}
+                  </span>
+                </div>
+                <p className="text-emerald-800/90 text-xs mt-0.5 font-medium">
+                  Đề thi sau khi bóc tách sẽ được lưu riêng biệt cho tài khoản này và chỉ tài khoản của bạn mới có thể truy cập ôn luyện.
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 text-xs font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+              Bảo mật tài khoản
+            </span>
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-6 h-6 text-amber-600 shrink-0" />
+              <div>
+                <div className="font-extrabold text-amber-950">
+                  Bạn chưa đăng nhập tài khoản
+                </div>
+                <p className="text-amber-800 text-xs mt-0.5">
+                  Đề thi sẽ chỉ được lưu tạm trên máy này. Hãy đăng nhập để đề thi được gắn vĩnh viễn với tài khoản cá nhân và chỉ hiển thị cho bạn.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/login"
+              className="shrink-0 text-xs font-bold text-white bg-[#0f2d22] hover:bg-[#184232] px-4 py-2 rounded-xl transition shadow-xs self-start sm:self-auto"
+            >
+              Đăng nhập ngay
+            </Link>
+          </div>
+        )}
+
         {/* KHỐI 1: CHỌN MÃ ĐỀ (4 CARD CHUYÊN BIỆT) */}
         <div className="space-y-3">
           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -368,27 +471,6 @@ function UploadContent() {
                 </div>
               );
             })}
-          </div>
-        </div>
-
-        {/* NÚT THỬ NGHIỆM NHANH: NẠP DỮ LIỆU MẪU CỦA 4 MÃ ĐỀ */}
-        <div className="bg-slate-100/80 p-3.5 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-slate-700 font-semibold">
-            <BookOpen className="w-4 h-4 text-emerald-800" />
-            <span>Chưa có file PDF? Thử nghiệm ngay với đề mẫu chuẩn hoá:</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {(['CA1', 'CA2', 'CA3', 'CA4'] as const).map((ca) => (
-              <button
-                key={`sample-${ca}`}
-                type="button"
-                onClick={() => handleLoadSample(ca)}
-                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Mẫu {ca} ({PAPER_META[ca].subject})</span>
-              </button>
-            ))}
           </div>
         </div>
 
@@ -534,6 +616,25 @@ function UploadContent() {
                   />
                 </div>
               </div>
+
+              {/* Tùy chọn quyền Admin: Công khai đề thi cho mọi người */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <label htmlFor="isPublicCheck" className="text-xs font-bold text-slate-800 block cursor-pointer">
+                    Đề thi công khai (Admin upload đề miễn phí)
+                  </label>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Tích chọn nếu bạn là Admin muốn mở đề miễn phí cho toàn bộ thí sinh. Nếu không chọn, đề thi được lưu riêng tư và chỉ tài khoản của bạn mới xem được.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="isPublicCheck"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="w-5 h-5 text-emerald-700 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer ml-3 shrink-0"
+                />
+              </div>
             </div>
           </div>
 
@@ -562,9 +663,9 @@ function UploadContent() {
                   <span className="font-semibold text-slate-900">{examDuration} phút</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Chi phí lượt tải:</span>
-                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                    Miễn phí
+                  <span>Quyền hiển thị:</span>
+                  <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${isPublic ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-900'}`}>
+                    {isPublic ? 'Công khai (Admin)' : 'Riêng tư (Chỉ bạn)'}
                   </span>
                 </div>
               </div>
@@ -583,6 +684,13 @@ function UploadContent() {
             </div>
 
             <div className="mt-8 pt-4 space-y-3">
+              {errorMessage && (
+                <div className="p-3 bg-red-50 border border-red-300 rounded-xl text-red-900 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span className="font-medium leading-relaxed">{errorMessage}</span>
+                </div>
+              )}
+
               {isParsing && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-xs flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin shrink-0 text-blue-600" />
@@ -663,17 +771,21 @@ function UploadContent() {
             </div>
 
             {savedExamId && (
-              <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-900 text-sm flex items-center justify-between">
-                <div className="flex items-center gap-2 font-medium">
+              <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-900 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5 font-medium">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                   <span>
-                    Đề thi đã được lưu thành công vào Cơ sở dữ liệu với mã <strong>{savedExamId}</strong>!
+                    Đề thi đã được lưu thành công với mã <strong>{savedExamId}</strong> (gắn với ID tài khoản:{' '}
+                    <strong className="font-mono text-emerald-950">
+                      {candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || 'Tạm thời'}
+                    </strong>
+                    ). Đề thi này được bảo mật và <strong>chỉ hiển thị riêng cho tài khoản của bạn</strong>!
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => router.push('/select-exam')}
-                  className="text-xs font-bold text-emerald-800 underline hover:text-emerald-950"
+                  className="text-xs font-bold text-emerald-800 underline hover:text-emerald-950 shrink-0 cursor-pointer"
                 >
                   Xem trong danh sách đề thi &rarr;
                 </button>

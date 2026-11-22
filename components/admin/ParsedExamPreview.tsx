@@ -40,6 +40,10 @@ export interface PreviewQuestion {
 
 export interface ParsedData {
   id?: string;
+  ownerId?: string;
+  userId?: string;
+  ownerName?: string;
+  ownerEmail?: string;
   paperCode?: string;
   examCode?: string;
   examTitle?: string;

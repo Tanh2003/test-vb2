@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { GoogleGenAI } from '@google/genai';
+import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import {
   PaperCode,
   PAPER_META,
@@ -15,7 +17,6 @@ import {
   validateExtraction,
   toDomainQuestions,
 } from '@/mock/exam';
-import { SAMPLES_BY_CODE } from '@/mock/mock-samples';
 
 const apiKey =
   process.env.GEMINI_API_KEY ||
@@ -35,10 +36,9 @@ async function callGeminiPdf<T>(
   schema: object,
 ): Promise<T | null> {
   const candidateModels = [
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'gemini-3.6-flash',
-    'gemini-3.1-pro-preview',
+   'gemini-3.8-flash',       // Ưu tiên 1: Nhanh, rẻ, chuẩn LaTeX
+  'gemini-4-hydrogen',      // Ưu tiên 2: Dòng Gemini 4 dự phòng
+  'gemini-3.5-flash-lite'   // Ưu tiên 3: Siêu tiết kiệm
   ];
 
   for (const model of candidateModels) {
@@ -82,9 +82,29 @@ export async function POST(req: NextRequest) {
     const customTitle = (formData.get('examTitle') as string) || '';
     const durationMinutes = parseInt((formData.get('durationMinutes') as string) || '150', 10);
 
+    // 0. Xác thực tài khoản người dùng từ Session Cookie hoặc FormData
+    let sessionUid: string | null = null;
+    let sessionEmail: string | null = null;
+    try {
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get('session')?.value;
+      if (sessionCookie) {
+        const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+        sessionUid = decoded.uid;
+        sessionEmail = decoded.email || null;
+      }
+    } catch {
+      // Bỏ qua nếu chưa đăng nhập qua session cookie
+    }
+
+    const formOwnerId = ((formData.get('ownerId') as string) || (formData.get('userId') as string) || '').trim();
+    const ownerName = ((formData.get('ownerName') as string) || '').trim();
+    const ownerEmail = ((formData.get('ownerEmail') as string) || sessionEmail || '').trim();
+    const isPublicParam = formData.get('isPublic') === 'true';
+    const finalOwnerId = sessionUid || formOwnerId || 'anonymous';
+
     let extractedExam: ExtractedExam | null = null;
     let extractedKey: ExtractedAnswerKey | null = null;
-    let usedFallback = false;
 
     // 1. Bóc tách PDF Đề thi
     if (examFile) {
@@ -108,18 +128,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Nếu AI không đọc được hoặc không có file (hoặc API quota hết), dùng mẫu chuẩn theo mã đề
-    if (!extractedExam) {
-      console.warn(`[import-pdf] Sử dụng dữ liệu bóc tách mẫu dự phòng cho mã đề ${chosenCode}.`);
-      usedFallback = true;
-      const sample = SAMPLES_BY_CODE[chosenCode] || SAMPLES_BY_CODE.CA1;
-      // Deep clone sample
-      extractedExam = JSON.parse(JSON.stringify(sample));
-    }
-
+    // 3. Nếu AI không bóc tách được từ PDF, trả về lỗi thực tế, không tạo mẫu giả
     if (!extractedExam) {
       return NextResponse.json(
-        { error: 'Không thể phân tích đề thi từ file PDF.' },
+        { error: 'Không thể phân tích đề thi từ file PDF đã tải lên. Vui lòng kiểm tra lại chất lượng file PDF hoặc API Gemini.' },
         { status: 500 }
       );
     }
@@ -237,6 +249,11 @@ export async function POST(req: NextRequest) {
 
     const examRecord = {
       id: examId,
+      ownerId: finalOwnerId,
+      userId: finalOwnerId,
+      ownerName,
+      ownerEmail,
+      isPublic: isPublicParam,
       examCode: paperCode,
       paperCode,
       subject: PAPER_META[paperCode]?.subject || 'Môn thi chuyên ngành',
@@ -259,10 +276,7 @@ export async function POST(req: NextRequest) {
       shortAnswers,
       createdAt: new Date().toISOString(),
       status: validationErrors.length > 0 ? 'needs_review' : 'published',
-      warnings: [
-        ...(extractedExam.warnings || []),
-        ...(usedFallback ? ['Đang hiển thị đề thi mẫu chuẩn hoá 2026 (chế độ dự phòng thông minh).'] : []),
-      ],
+      warnings: extractedExam.warnings || [],
     };
 
     try {
@@ -280,9 +294,25 @@ export async function POST(req: NextRequest) {
       console.warn('Lỗi ghi Firebase Realtime REST:', msg);
     }
 
+    // Đồng thời đồng bộ sang Firestore
+    try {
+      if (adminDb && finalOwnerId && finalOwnerId !== 'anonymous') {
+        await adminDb.collection('exams').doc(examId).set({
+          ...examRecord,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    } catch (fsErr) {
+      console.warn('Lưu Firestore phụ:', fsErr);
+    }
+
     return NextResponse.json({
       success: true,
       id: examId,
+      ownerId: finalOwnerId,
+      userId: finalOwnerId,
+      ownerName,
+      ownerEmail,
       examCode: paperCode,
       paperCode,
       subject: PAPER_META[paperCode]?.subject || '',
@@ -299,7 +329,6 @@ export async function POST(req: NextRequest) {
       validationErrors,
       warnings: examRecord.warnings,
       savedToFirebase,
-      usedFallback,
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Có lỗi xảy ra khi xử lý file đề thi.';
