@@ -191,3 +191,63 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Xoá đề thi khỏi Firebase Realtime Database & Firestore
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const examId = searchParams.get('id');
+
+    if (!examId) {
+      return NextResponse.json({ error: 'Thiếu mã đề thi cần xoá' }, { status: 400 });
+    }
+
+    const sessionUserId = await getSessionUserId();
+
+    // Lấy thông tin đề để kiểm tra quyền sở hữu
+    const getRes = await fetch(`${FIREBASE_DB_URL}/exams/${examId}.json`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (getRes.ok) {
+      const examData = await getRes.json();
+      if (examData) {
+        const owner = examData.ownerId || examData.userId || '';
+        // Nếu có session mà không phải chủ sở hữu thì chặn
+        if (sessionUserId && owner && owner !== 'anonymous' && owner !== sessionUserId) {
+          return NextResponse.json(
+            { error: 'Bạn không có quyền xoá đề thi của tài khoản khác' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
+    const res = await fetch(`${FIREBASE_DB_URL}/exams/${examId}.json`, {
+      method: 'DELETE',
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Firebase returned status ${res.status}`);
+    }
+
+    try {
+      if (adminDb) {
+        await adminDb.collection('exams').doc(examId).delete();
+      }
+    } catch (fsErr) {
+      console.warn('Lỗi Firestore xoá đề:', fsErr);
+    }
+
+    return NextResponse.json({ success: true, id: examId });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Lỗi xoá đề thi:', msg);
+    return NextResponse.json(
+      { error: msg || 'Không thể xoá đề thi khỏi hệ thống' },
+      { status: 500 }
+    );
+  }
+}

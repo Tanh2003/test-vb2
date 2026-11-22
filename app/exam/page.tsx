@@ -18,6 +18,7 @@ import {
   Check,
   X,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import MathText from '@/components/common/MathText';
 import {
@@ -199,8 +200,8 @@ function ExamContent() {
         const parsed = JSON.parse(info);
         if (parsed.sbd) setSbd(parsed.sbd);
         if (parsed.fullName || parsed.name) setCandidateName(parsed.fullName || parsed.name);
-        if (parsed.uid || parsed.id || parsed.email)
-          setCandidateId(parsed.uid || parsed.id || parsed.email);
+        const resolvedId = parsed.uid || parsed.id || parsed.sbd || parsed.email || '';
+        if (resolvedId) setCandidateId(resolvedId);
       }
     } catch {
       /* ignore */
@@ -340,6 +341,7 @@ function ExamContent() {
 
     const submissionId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const timeSpent = Math.max(0, initialDurationRef.current - timeLeft);
+    const activeUserId = candidateId || sbd || 'cand_vb2';
 
     const submissionResult: SubmissionResult = {
       id: submissionId,
@@ -347,7 +349,8 @@ function ExamContent() {
       paperCode: paperCode,
       subject: meta.subject,
       examTitle: examTitle || `${paperCode} • ${meta.subject}`,
-      candidateId: candidateId || 'cand_vb2',
+      candidateId: activeUserId,
+      userId: activeUserId,
       candidateName: candidateName || 'Thí sinh CAND',
       sbd: sbd || 'CAND-2026',
       submittedAt: new Date().toISOString(),
@@ -365,7 +368,8 @@ function ExamContent() {
       essayFeedback,
       essayText,
       details,
-    };
+      savedToFirebase: true,
+    } as any;
 
     // 1. Lưu an toàn vào trình duyệt (localStorage)
     try {
@@ -387,11 +391,16 @@ function ExamContent() {
 
     // 2. Gửi lưu trữ lên Firebase Realtime Database & Firestore
     try {
-      await fetch('/api/submissions', {
+      const res = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submissionResult),
       });
+      if (res.ok) {
+        console.log('Đã lưu bài thi lên CSDL Firebase thành công!');
+      } else {
+        console.warn('Lỗi lưu Firebase (status):', res.status);
+      }
     } catch (apiErr) {
       console.warn('Gửi kết quả lên Firebase gặp lỗi:', apiErr);
     }
@@ -1025,6 +1034,25 @@ function ExamContent() {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY KHI ĐANG LƯU VÀO FIREBASE */}
+      {isSubmitting && (
+        <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center space-y-4 shadow-2xl border border-slate-100">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto border-2 border-emerald-200">
+              <Loader2 className="w-8 h-8 animate-spin" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">
+                Đang chấm điểm & Lưu bài thi
+              </h3>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Hệ thống đang đồng bộ kết quả làm bài của bạn lên cơ sở dữ liệu <strong>Firebase</strong>. Vui lòng chờ trong giây lát...
+              </p>
             </div>
           </div>
         </div>

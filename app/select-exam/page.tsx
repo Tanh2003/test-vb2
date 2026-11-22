@@ -166,6 +166,13 @@ export default function SelectExamPage() {
 
           <div className="flex items-center gap-2.5">
             <Link
+              href="/upload-history"
+              className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 text-emerald-100 transition cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-300" />
+              <span>Lịch sử upload</span>
+            </Link>
+            <Link
               href="/import"
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#c1121f] hover:bg-[#a50f1a] text-white transition cursor-pointer shadow-sm active:scale-[0.98]"
             >

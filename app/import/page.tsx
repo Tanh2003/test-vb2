@@ -552,7 +552,7 @@ function UploadContent() {
             </div>
           </Link>
 
-          <div className="flex items-center gap-4 sm:gap-8 text-xs sm:text-sm font-medium">
+          <div className="flex items-center gap-4 sm:gap-7 text-xs sm:text-sm font-medium">
             <Link href="/" className="text-emerald-100/80 hover:text-white transition">
               Thư viện đề
             </Link>
@@ -561,6 +561,9 @@ function UploadContent() {
               className="text-white font-semibold underline underline-offset-4 decoration-amber-400"
             >
               Upload đề
+            </Link>
+            <Link href="/upload-history" className="text-emerald-100/80 hover:text-white transition">
+              Lịch sử upload
             </Link>
             <Link href="/select-exam" className="text-emerald-100/80 hover:text-white transition">
               Ngân hàng đề thi
@@ -1218,7 +1221,7 @@ function UploadContent() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={handleUpdateExam}
@@ -1228,6 +1231,13 @@ function UploadContent() {
                       <Edit3 className="w-3.5 h-3.5" />
                       <span>Cập nhật chỉnh sửa</span>
                     </button>
+                    <Link
+                      href="/upload-history"
+                      className="text-xs font-bold text-emerald-900 bg-white border border-emerald-300 hover:bg-emerald-50 px-3.5 py-2 rounded-xl shrink-0 transition shadow-2xs flex items-center gap-1"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Lịch sử upload</span>
+                    </Link>
                     <button
                       type="button"
                       onClick={() => router.push('/select-exam')}

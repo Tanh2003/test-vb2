@@ -206,12 +206,18 @@ export default function ProfilePage() {
             </div>
           </Link>
 
-          <div className="flex items-center gap-4 sm:gap-8 text-xs sm:text-sm font-medium">
+          <div className="flex items-center gap-4 sm:gap-7 text-xs sm:text-sm font-medium">
             <Link href="/" className="text-emerald-100/80 hover:text-white transition">
               Thư viện đề
             </Link>
             <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
               Upload đề
+            </Link>
+            <Link href="/upload-history" className="text-emerald-100/80 hover:text-white transition">
+              Lịch sử upload
+            </Link>
+            <Link href="/select-exam" className="text-emerald-100/80 hover:text-white transition">
+              Ngân hàng đề thi
             </Link>
             <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
               Lịch sử làm đề

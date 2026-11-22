@@ -24,6 +24,10 @@ import {
   TrendingUp,
   Printer,
   ChevronRight,
+  Trash2,
+  Cloud,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 import MathText from '@/components/common/MathText';
 import { SubmissionResult, SubmissionDetail, PaperCode, PAPER_META } from '@/types/exam';
@@ -86,110 +90,151 @@ function ResultContent() {
   const [candidateId, setCandidateId] = useState('');
   const [candidateName, setCandidateName] = useState('');
 
-  // 1. Tải dữ liệu lịch sử thi
-  useEffect(() => {
-    let ignore = false;
+  // 1. Tải dữ liệu lịch sử thi (Ưu tiên Firebase Realtime Database)
+  const loadData = async () => {
+    setIsLoading(true);
 
-    const loadData = async () => {
-      setIsLoading(true);
+    let cId = '';
+    let cSbd = '';
+    try {
+      const candStr = localStorage.getItem('candidate_info');
+      if (candStr) {
+        const c = JSON.parse(candStr);
+        cId = c.uid || c.id || c.sbd || c.email || '';
+        cSbd = c.sbd || '';
+        setCandidateId(cId);
+        setCandidateName(c.fullName || c.name || '');
+      }
+    } catch {}
 
-      let cId = '';
-      let cSbd = '';
-      try {
-        const candStr = localStorage.getItem('candidate_info');
-        if (candStr) {
-          const c = JSON.parse(candStr);
-          cId = c.uid || c.id || c.sbd || c.email || '';
-          cSbd = c.sbd || '';
-          setCandidateId(cId);
-          setCandidateName(c.fullName || c.name || '');
+    const historyMap = new Map<string, SubmissionResult>();
+
+    // A. Đọc trực tiếp từ Firebase (nguồn lưu trữ đám mây chính thức)
+    try {
+      const url = cId
+        ? `/api/submissions?userId=${encodeURIComponent(cId)}`
+        : '/api/submissions';
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list)) {
+          list.forEach((item) => {
+            if (item && item.id) {
+              historyMap.set(item.id, { ...item, savedToFirebase: true });
+            }
+          });
         }
-      } catch {}
+      }
+    } catch (err) {
+      console.warn('Lỗi tải lịch sử từ Firebase:', err);
+    }
 
-      // Tải từ Firebase & LocalStorage
-      const historyMap = new Map<string, SubmissionResult>();
-
-      // A. Đọc localStorage
-      try {
-        const rawHistory = localStorage.getItem('submissions_history');
-        if (rawHistory) {
-          const arr = JSON.parse(rawHistory);
-          if (Array.isArray(arr)) {
-            arr.forEach((item) => {
-              if (item && item.id) {
-                // Chỉ lấy đề của thí sinh này nếu đã đăng nhập
-                if (!cId || !item.candidateId || item.candidateId === cId || item.sbd === cSbd) {
+    // B. Đọc localStorage (đồng bộ bài thi ngoại tuyến chưa gửi lên Firebase)
+    try {
+      const rawHistory = localStorage.getItem('submissions_history');
+      if (rawHistory) {
+        const arr = JSON.parse(rawHistory);
+        if (Array.isArray(arr)) {
+          arr.forEach((item) => {
+            if (item && item.id) {
+              const isMatch = !cId || !item.candidateId || item.candidateId === cId || item.sbd === cSbd || (item as any).userId === cId;
+              if (isMatch) {
+                if (!historyMap.has(item.id)) {
                   historyMap.set(item.id, item);
+                  // Tự động đồng bộ lên Firebase nếu chưa có
+                  fetch('/api/submissions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item),
+                  }).catch(() => {});
                 }
               }
-            });
-          }
+            }
+          });
         }
-      } catch {}
+      }
+    } catch {}
 
-      // B. Đọc từ Firebase
-      try {
-        const url = cId
-          ? `/api/submissions?userId=${encodeURIComponent(cId)}`
-          : '/api/submissions';
-        const res = await fetch(url);
-        if (res.ok) {
-          const list = await res.json();
-          if (Array.isArray(list)) {
-            list.forEach((item) => {
-              if (item && item.id) {
-                historyMap.set(item.id, item);
-              }
-            });
+    const all = Array.from(historyMap.values()).sort(
+      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    );
+
+    setHistoryList(all);
+
+    // Nếu có param ?id= trên URL, tìm bài làm đó để mở chi tiết
+    if (submissionId) {
+      let found = all.find((item) => item.id === submissionId);
+      if (!found) {
+        // Tải trực tiếp từ Firebase theo ID bài nộp
+        try {
+          const resSingle = await fetch(`/api/submissions?id=${encodeURIComponent(submissionId)}`, {
+            cache: 'no-store',
+          });
+          if (resSingle.ok) {
+            found = await resSingle.json();
           }
-        }
-      } catch (err) {
-        console.warn('Lỗi tải lịch sử từ Firebase:', err);
+        } catch {}
       }
 
-      const all = Array.from(historyMap.values()).sort(
-        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
-      );
-
-      if (!ignore) {
-        setHistoryList(all);
-
-        // Nếu có param ?id= trên URL, tìm bài làm đó để mở chi tiết
-        if (submissionId) {
-          const found = all.find((item) => item.id === submissionId);
-          if (found) {
-            setCurrentResult(found);
+      if (found) {
+        setCurrentResult(found);
+        setViewMode('detail');
+      } else {
+        // Thử đọc từ localStorage riêng lẻ
+        try {
+          const single = localStorage.getItem(`submission_${submissionId}`);
+          if (single) {
+            const parsed = JSON.parse(single);
+            setCurrentResult(parsed);
             setViewMode('detail');
           } else {
-            // Thử đọc từ localStorage riêng lẻ
-            try {
-              const single = localStorage.getItem(`submission_${submissionId}`);
-              if (single) {
-                const parsed = JSON.parse(single);
-                setCurrentResult(parsed);
-                setViewMode('detail');
-              } else {
-                setViewMode('list');
-              }
-            } catch {
-              setViewMode('list');
-            }
+            setViewMode('list');
           }
-        } else {
-          // KHÔNG MỞ SẴN BÀI LÀM NÀO: Luôn mặc định mở giao diện danh sách đề đã làm
-          setCurrentResult(null);
+        } catch {
           setViewMode('list');
         }
-
-        setIsLoading(false);
       }
-    };
+    } else {
+      // Luôn mặc định mở giao diện danh sách đề đã làm
+      setCurrentResult(null);
+      setViewMode('list');
+    }
 
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
     loadData();
-    return () => {
-      ignore = true;
-    };
   }, [submissionId]);
+
+  // Xoá bài thi khỏi Firebase & LocalStorage
+  const handleDeleteSubmission = async (sub: SubmissionResult, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ok = confirm(`Bạn có chắc chắn muốn xoá kết quả bài thi "${sub.examTitle}" khỏi hệ thống Firebase không?`);
+    if (!ok) return;
+
+    try {
+      await fetch(`/api/submissions?id=${encodeURIComponent(sub.id)}`, {
+        method: 'DELETE',
+      });
+      setHistoryList((prev) => prev.filter((item) => item.id !== sub.id));
+      try {
+        const raw = localStorage.getItem('submissions_history');
+        if (raw) {
+          const list = JSON.parse(raw).filter((item: any) => item.id !== sub.id);
+          localStorage.setItem('submissions_history', JSON.stringify(list));
+        }
+        localStorage.removeItem(`submission_${sub.id}`);
+      } catch {}
+
+      if (currentResult?.id === sub.id) {
+        setViewMode('list');
+        setCurrentResult(null);
+      }
+    } catch (err) {
+      console.error('Lỗi xoá bài thi:', err);
+    }
+  };
 
   // Lọc danh sách đề đã làm
   const filteredHistory = useMemo(() => {
@@ -296,6 +341,9 @@ function ResultContent() {
             <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
               Upload đề
             </Link>
+            <Link href="/upload-history" className="text-emerald-100/80 hover:text-white transition">
+              Lịch sử upload
+            </Link>
             <Link href="/" className="text-emerald-100/80 hover:text-white transition">
               Trang chủ
             </Link>
@@ -332,14 +380,26 @@ function ResultContent() {
                 </p>
               </div>
 
-              {/* Nút vào làm đề mới */}
-              <Link
-                href="/select-exam"
-                className="self-start md:self-auto px-5 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-xs sm:text-sm shadow-md shadow-red-950/20 flex items-center gap-2 transition active:scale-[0.98]"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>Thi đề mới</span>
-              </Link>
+              {/* Nút thao tác */}
+              <div className="flex items-center gap-2.5 self-start md:self-auto">
+                <button
+                  onClick={() => loadData()}
+                  disabled={isLoading}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm border border-slate-200 flex items-center gap-2 transition cursor-pointer"
+                  title="Tải lại và đồng bộ kết quả từ Firebase"
+                >
+                  <RefreshCw className={`w-4 h-4 text-emerald-700 ${isLoading ? 'animate-spin' : ''}`} />
+                  <span>Đồng bộ Firebase</span>
+                </button>
+
+                <Link
+                  href="/select-exam"
+                  className="px-5 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-xs sm:text-sm shadow-md shadow-red-950/20 flex items-center gap-2 transition active:scale-[0.98]"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Thi đề mới</span>
+                </Link>
+              </div>
             </div>
 
             {/* 4 Thẻ số liệu thống kê */}
@@ -473,6 +533,10 @@ function ResultContent() {
                           <span className="text-xs font-bold text-slate-600">
                             {meta.subject}
                           </span>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Cloud className="w-3 h-3 text-emerald-600" />
+                            Firebase
+                          </span>
                           {isFirst && (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200">
                               Mới nhất
@@ -583,6 +647,14 @@ function ResultContent() {
                           >
                             <RotateCcw className="w-4 h-4" />
                           </button>
+
+                          <button
+                            onClick={(e) => handleDeleteSubmission(item, e)}
+                            className="p-2.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 transition cursor-pointer"
+                            title="Xoá kết quả này khỏi Firebase"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -626,6 +698,14 @@ function ResultContent() {
                   >
                     <Printer className="w-4 h-4" />
                   </button>
+
+                  <button
+                    onClick={(e) => handleDeleteSubmission(currentResult, e)}
+                    className="p-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 transition cursor-pointer"
+                    title="Xoá kết quả này khỏi Firebase"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
@@ -633,12 +713,16 @@ function ResultContent() {
               <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-sm space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
                   <div>
-                    <div className="flex items-center gap-2 mb-1.5">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
                       <span className="px-3 py-1 rounded-xl text-xs font-black bg-[#0f2d22] text-amber-300">
                         MÃ ĐỀ: {currentResult.paperCode}
                       </span>
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
                         {currentResult.subject}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <Cloud className="w-3 h-3 text-emerald-600" />
+                        Đã lưu an toàn trên Firebase
                       </span>
                     </div>
                     <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
