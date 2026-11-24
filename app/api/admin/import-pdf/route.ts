@@ -27,7 +27,7 @@ const ai = new GoogleGenAI({ apiKey });
 const FIREBASE_DB_URL =
   'https://exam-vb2-default-rtdb.asia-southeast1.firebasedatabase.app';
 
-export const maxDuration = 120; // 120s timeout for multi-page PDF processing
+export const maxDuration = 300; // 120s timeout for multi-page PDF processing
 
 // Hàm gọi Gemini an toàn với Gemini File API và cơ chế retry / fallback model
 async function callGeminiPdf<T>(
@@ -36,13 +36,11 @@ async function callGeminiPdf<T>(
   schema: object,
   displayName = 'exam_document.pdf'
 ): Promise<T | null> {
-  const candidateModels = [
-    'gemini-3.8-flash',          // Ưu tiên 1: Nhanh, chuẩn LaTeX
-    'gemini-3.7-flash',          // Ưu tiên 2: Ổn định cao
-    'gemini-3.5-flash',          // Ưu tiên 3: Bản cũ hơn nhưng server rất rảnh, ít 503
-    'gemini-3.5-flash-lite',     // Ưu tiên 4: Nhẹ, phản hồi tức thì
-    'gemini-3.5-pro',            // Ưu tiên 5: Dự phòng hạng nặng (bóc tách công thức toán cực chuẩn)
-  ];
+ const candidateModels = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.8-flash',
+  'gemini-pro-latest', // chỉ khi 2 cái trên lỗi
+];
 
   let blob: Blob;
   if (fileInput instanceof Blob) {
@@ -95,7 +93,7 @@ async function callGeminiPdf<T>(
     // 2. Vòng lặp duyệt qua candidateModels tái sử dụng cùng 1 fileUri
     for (const model of candidateModels) {
       let attempt = 0;
-      const maxAttempts = 2; // 1 lần đầu + 1 lần retry nếu gặp lỗi 503/429
+      const maxAttempts = 1; // 1 lần đầu + 1 lần retry nếu gặp lỗi 503/429
 
       while (attempt < maxAttempts) {
         attempt++;
