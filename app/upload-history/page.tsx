@@ -28,6 +28,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { PAPER_META, PaperCode } from '@/types/exam';
+import Header from '@/components/common/Header';
 
 interface CandidateInfo {
   uid?: string;
@@ -228,82 +229,8 @@ function UploadHistoryContent() {
 
   return (
     <div className="min-h-screen bg-[#f7f8f7] text-slate-800 font-sans flex flex-col justify-between">
-      {/* 1. HEADER CHUẨN XANH RÊU CAND */}
-      <header className="bg-[#0f2d22] text-white sticky top-0 z-40 shadow-sm border-b border-emerald-900/60">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 relative flex items-center justify-center shrink-0">
-              <svg viewBox="0 0 36 42" className="w-full h-full drop-shadow">
-                <path
-                  d="M18 1L33 6.5V20C33 30 26 38 18 41C10 38 3 30 3 20V6.5L18 1Z"
-                  fill="#C1121F"
-                  stroke="#FBBF24"
-                  strokeWidth="2.5"
-                />
-                <polygon
-                  points="18,10 20.8,16.5 27.5,17 22.5,21.5 24,28 18,24.5 12,28 13.5,21.5 8.5,17 15.2,16.5"
-                  fill="#FBBF24"
-                />
-              </svg>
-            </div>
-            <div>
-              <div className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-amber-400 leading-tight">
-                THI ONLINE VB2
-              </div>
-              <div className="text-[11px] text-slate-200/90 font-medium">
-                Văn bằng 2 Công an nhân dân
-              </div>
-            </div>
-          </Link>
-
-          {/* Nav links */}
-          <div className="flex items-center gap-4 sm:gap-7 text-xs sm:text-sm font-medium">
-            <Link href="/" className="text-emerald-100/80 hover:text-white transition">
-              Thư viện đề
-            </Link>
-            <Link href="/select-exam" className="text-emerald-100/80 hover:text-white transition">
-              Ngân hàng đề thi
-            </Link>
-            {candidate ? (
-              <>
-                <Link href="/import" className="text-emerald-100/80 hover:text-white transition">
-                  Upload đề
-                </Link>
-                <Link
-                  href="/upload-history"
-                  className="text-white font-semibold underline underline-offset-4 decoration-amber-400"
-                >
-                  Lịch sử upload
-                </Link>
-                <Link href="/result" className="text-emerald-100/80 hover:text-white transition">
-                  Lịch sử làm đề
-                </Link>
-                <Link
-                  href="/profile"
-                  className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs sm:text-sm pl-2 transition"
-                >
-                  [{candidate.fullName || candidate.sbd || candidate.username || 'TÀI KHOẢN'}]
-                </Link>
-              </>
-            ) : (
-              <div className="flex items-center gap-2 sm:gap-3 pl-2">
-                <Link
-                  href="/login"
-                  className="text-amber-300 hover:text-amber-200 font-semibold text-xs sm:text-sm transition"
-                >
-                  Đăng nhập
-                </Link>
-                <Link
-                  href="/signup"
-                  className="px-3.5 py-1.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
-                >
-                  Đăng ký
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* 1. HEADER (Shared Component) */}
+      <Header />
 
       {/* 2. MAIN CONTAINER */}
       <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 flex-1">
