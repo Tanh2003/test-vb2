@@ -70,13 +70,13 @@ export default function AboutPage() {
     },
     {
       icon: Cpu,
-      title: 'AI Bóc Tách Đề Thi Tự Động (Gemini 2.5)',
-      desc: 'Công nghệ trí tuệ nhân tạo đọc tài liệu PDF, chuẩn hóa công thức toán học LaTeX, ma trận đáp án và trích xuất ngữ liệu câu hỏi nhóm chính xác.',
+      title: 'Trợ Lý AI Tự Động Chuyển Đổi Đề Thi',
+      desc: 'Công nghệ trí tuệ nhân tạo thông minh tự động đọc tài liệu PDF, nhận diện câu hỏi, công thức toán học và trích xuất ma trận đáp án chính xác.',
     },
     {
       icon: Cloud,
-      title: 'Lưu Trữ Đám Mây An Toàn & Độc Quyền',
-      desc: 'Tệp PDF gốc được lưu trữ bảo mật trên đám mây Backblaze B2 và cơ sở dữ liệu Firebase. Đề thi cá nhân chỉ tài khoản của bạn mới có thể truy cập.',
+      title: 'Lưu Trữ An Toàn & Bảo Mật Tuyệt Đối',
+      desc: 'Tệp PDF gốc và dữ liệu đề thi được bảo mật trên máy chủ chuyên dụng. Đề thi cá nhân chỉ tài khoản của bạn mới có thể xem và làm bài.',
     },
     {
       icon: Award,

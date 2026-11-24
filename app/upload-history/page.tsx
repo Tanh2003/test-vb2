@@ -147,7 +147,7 @@ function UploadHistoryContent() {
   // Xoá đề thi trực tiếp trên Firebase
   const handleDeleteExam = async (exam: UploadedExamItem) => {
     const confirmDelete = confirm(
-      `Bạn có chắc chắn muốn xoá đề thi "${exam.title || exam.id}" khỏi hệ thống Firebase không?\n\nHành động này không thể hoàn tác.`
+      `Bạn có chắc chắn muốn xoá đề thi "${exam.title || exam.id}" khỏi kho đề thi của bạn không?\n\nHành động này không thể hoàn tác.`
     );
     if (!confirmDelete) return;
 
@@ -239,17 +239,13 @@ function UploadHistoryContent() {
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 mb-2 border border-emerald-200">
               <Cloud className="w-3.5 h-3.5 text-emerald-700" />
-              <span>QUẢN LÝ LƯU TRỮ ĐỀ THI & ĐÁM MÂY BACKBLAZE B2</span>
+              <span>QUẢN LÝ KHO ĐỀ THI CÁ NHÂN</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0f2d22]">
               Lịch Sử Upload Đề Thi
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 mt-1">
-              Xem lại danh sách các đề thi bạn đã bóc tách bằng AI và lưu trữ tệp PDF trên Backblaze B2 (Bucket:{' '}
-              <code className="bg-slate-200 px-1 py-0.5 rounded font-mono text-emerald-900 font-bold">
-                file-vb2
-              </code>
-              ).
+              Xem lại danh sách các đề thi bạn đã bóc tách bằng AI và được lưu trữ an toàn trên hệ thống.
             </p>
           </div>
 
@@ -279,17 +275,20 @@ function UploadHistoryContent() {
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>
                 Đang hiển thị đề thi của tài khoản:{' '}
-                <strong>{candidate.fullName || candidate.username || 'Thí sinh'}</strong> (ID:{' '}
-                <span className="font-mono text-emerald-900 font-bold">
-                  {candidate.uid || candidate.id || candidate.sbd || candidate.email}
-                </span>
-                )
+                <strong>{candidate.fullName || candidate.username || 'Thí sinh'}</strong>
+                {candidate.sbd && candidate.sbd.length <= 15 ? (
+                  <span className="ml-1.5 font-mono text-emerald-900 font-bold bg-emerald-100 px-2 py-0.5 rounded">
+                    SBD: {candidate.sbd}
+                  </span>
+                ) : candidate.email ? (
+                  <span className="ml-1.5 text-emerald-800">({candidate.email})</span>
+                ) : null}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
                 <Cloud className="w-3.5 h-3.5 text-emerald-700" />
-                Dữ liệu trực tiếp từ Firebase
+                Đã lưu trữ trên hệ thống
               </span>
               <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
                 Chỉ tài khoản của bạn xem được
@@ -321,7 +320,7 @@ function UploadHistoryContent() {
             <span className="text-xl font-extrabold text-amber-700">{stats.ca4}</span>
           </div>
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-            <span className="text-[11px] font-semibold text-slate-500 block">Đã lưu PDF (B2)</span>
+            <span className="text-[11px] font-semibold text-slate-500 block">Đã lưu tệp PDF</span>
             <span className="text-xl font-extrabold text-teal-700 flex items-center gap-1">
               <Cloud className="w-4 h-4 text-teal-600" />
               {stats.withPdf}
@@ -467,13 +466,13 @@ function UploadHistoryContent() {
                           </span>
                         </div>
 
-                        {/* Trạng thái lưu trữ Backblaze B2 */}
+                        {/* Trạng thái lưu trữ tệp đề thi */}
                         <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
                           {exam.pdfFileUrl ? (
                             <span className="inline-flex items-center gap-1 text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-lg border border-teal-200 font-medium">
                               <Cloud className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                               <span>
-                                Đã lưu PDF trên <strong>Backblaze B2</strong> ({exam.pdfFileName || 'exam.pdf'})
+                                Tệp PDF gốc đã lưu an toàn ({exam.pdfFileName || 'exam.pdf'})
                               </span>
                             </span>
                           ) : (
@@ -498,7 +497,7 @@ function UploadHistoryContent() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 flex items-center gap-1 transition"
-                          title="Mở xem file PDF đề thi gốc trên Backblaze B2"
+                          title="Mở xem tệp PDF đề thi gốc"
                         >
                           <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
                           <span>Xem PDF gốc</span>
@@ -557,22 +556,22 @@ function UploadHistoryContent() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
                         <div className="space-y-1.5">
                           <span className="font-bold text-slate-700 block uppercase tracking-wider text-[11px]">
-                            Thông tin kỹ thuật đề thi
+                            Thông tin chi tiết đề thi
                           </span>
-                          <div className="text-slate-600 space-y-1 font-mono text-[11px]">
-                            <div>ID đề thi: <strong>{exam.id}</strong></div>
+                          <div className="text-slate-600 space-y-1 text-[11px]">
+                            <div>Mã đề thi: <strong>{exam.id}</strong></div>
                             <div>Mã môn: <strong>{pCode}</strong> ({subjectInfo?.subject})</div>
-                            <div>Tài khoản sở hữu: <strong>{exam.ownerId || exam.userId || 'Chưa định danh'}</strong></div>
+                            <div>Tài khoản tạo: <strong>{exam.ownerId && exam.ownerId.length > 20 ? (candidate?.fullName || candidate?.username || candidate?.email || 'Tài khoản của bạn') : (exam.ownerId || exam.userId || 'Tài khoản của bạn')}</strong></div>
                             <div>Thời gian làm bài: <strong>{durationMin} phút</strong></div>
                           </div>
                         </div>
 
                         <div className="space-y-1.5">
                           <span className="font-bold text-slate-700 block uppercase tracking-wider text-[11px]">
-                            Lưu trữ đám mây Backblaze B2
+                            Thông tin lưu trữ tệp đề thi
                           </span>
                           <div className="text-slate-600 space-y-1 text-[11px]">
-                            <div>Bucket lưu trữ: <code className="bg-emerald-100 text-emerald-900 font-bold px-1 rounded">file-vb2</code></div>
+                            <div>Trạng thái: <span className="bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded text-xs">Đã lưu trữ an toàn</span></div>
                             {exam.pdfFileUrl ? (
                               <div className="flex items-center gap-2 pt-1">
                                 <a
@@ -694,7 +693,7 @@ function UploadHistoryContent() {
 
       {/* 3. FOOTER */}
       <footer className="bg-[#0a2018] text-emerald-100/60 text-xs py-6 px-4 text-center mt-12 border-t border-emerald-950">
-        Hệ Thống Luyện Thi Trực Tuyến Tuyển Sinh Văn Bằng 2 Công An Nhân Dân &bull; Lịch sử upload và lưu trữ đề thi Backblaze B2
+        Hệ Thống Luyện Thi Trực Tuyến Tuyển Sinh Văn Bằng 2 Công An Nhân Dân &bull; Quản lý kho đề thi cá nhân
       </footer>
     </div>
   );

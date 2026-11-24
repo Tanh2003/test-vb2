@@ -322,8 +322,8 @@ export default function HomePage() {
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {candidate
-                    ? `Danh sách đề thi do tài khoản ${candidate.fullName || candidate.username || 'của bạn'} upload lên `
-                    : 'Đăng nhập để xem danh sách các đề thi bạn đã upload độc quyền'}
+                    ? `Danh sách đề thi do tài khoản ${candidate.fullName || candidate.username || 'của bạn'} tải lên`
+                    : 'Đăng nhập để xem danh sách các đề thi của bạn'}
                 </p>
               </div>
 

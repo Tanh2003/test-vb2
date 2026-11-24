@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const { stream, contentType, contentLength } = await downloadFileFromB2(key);
 
     if (!stream) {
-      return NextResponse.json({ error: 'Không thể đọc nội dung file từ B2' }, { status: 404 });
+      return NextResponse.json({ error: 'Không thể đọc nội dung tệp từ kho lưu trữ' }, { status: 404 });
     }
 
     const headers = new Headers();

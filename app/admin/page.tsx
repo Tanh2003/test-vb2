@@ -635,7 +635,7 @@ export default function AdminDashboardPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1.5 rounded-xl text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition"
-                            title="Xem file PDF gốc trên Backblaze B2"
+                            title="Xem tệp PDF đề thi gốc"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </a>

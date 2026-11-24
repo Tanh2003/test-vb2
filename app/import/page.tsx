@@ -376,7 +376,7 @@ function UploadContent() {
 
       if (examFile) {
         try {
-          setSavingStep('Đang tải file PDF đề thi lên lưu trữ đám mây Backblaze B2...');
+          setSavingStep('Đang tải tệp PDF đề thi lên hệ thống...');
           const fd = new FormData();
           fd.append('file', examFile);
           fd.append('folder', 'exams');
@@ -406,7 +406,7 @@ function UploadContent() {
 
       if (answerFile) {
         try {
-          setSavingStep('Đang tải file PDF đáp án lên lưu trữ đám mây Backblaze B2...');
+          setSavingStep('Đang tải tệp PDF đáp án lên hệ thống...');
           const fd = new FormData();
           fd.append('file', answerFile);
           fd.append('folder', 'answers');
@@ -428,7 +428,7 @@ function UploadContent() {
         }
       }
 
-      setSavingStep('Đang lưu dữ liệu đề thi vào Firebase Realtime Database...');
+      setSavingStep('Đang lưu dữ liệu câu hỏi vào ngân hàng đề...');
       const updatedQuestions = parsedData.questions || [];
 
       // Đồng bộ đáp án đúng sang các cấu trúc tương thích ngược
@@ -589,10 +589,16 @@ function UploadContent() {
               </div>
               <div>
                 <div className="font-extrabold text-[#0f2d22] flex items-center gap-2">
-                  <span>Tài khoản upload: {candidate.fullName || candidate.username || 'Thí sinh'}</span>
-                  <span className="font-mono text-[11px] bg-emerald-200/80 text-emerald-950 font-bold px-2 py-0.5 rounded-lg">
-                    ID: { candidate.sbd || candidate.email}
-                  </span>
+                  <span>Tài khoản: {candidate.fullName || candidate.username || 'Thí sinh'}</span>
+                  {candidate.sbd && candidate.sbd.length <= 15 ? (
+                    <span className="font-mono text-[11px] bg-emerald-200/80 text-emerald-950 font-bold px-2 py-0.5 rounded-lg">
+                      SBD: {candidate.sbd}
+                    </span>
+                  ) : candidate.email ? (
+                    <span className="text-[11px] bg-emerald-200/80 text-emerald-950 font-medium px-2 py-0.5 rounded-lg">
+                      {candidate.email}
+                    </span>
+                  ) : null}
                 </div>
                 <p className="text-emerald-800/90 text-xs mt-0.5 font-medium">
                   Đề thi sau khi bóc tách sẽ được lưu riêng biệt cho tài khoản này và chỉ tài khoản của bạn mới có thể truy cập ôn luyện.
@@ -1055,7 +1061,7 @@ function UploadContent() {
                     {isSaving ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{savingStep || 'Đang lưu đề & Upload B2...'}</span>
+                        <span>{savingStep || 'Đang lưu đề thi...'}</span>
                       </>
                     ) : missingAnswersCount > 0 ? (
                       <>
@@ -1108,7 +1114,7 @@ function UploadContent() {
                     {answerFile
                       ? `File đáp án bóc tách chưa nhận diện đủ toàn bộ các câu trong đề.`
                       : `Bạn không tải lên file đáp án kèm theo file đề thi.`}
-                    {' '}Theo quy định, bạn phải điền đáp án cho tất cả {parsedData.questions?.length || 50} câu hỏi tại <strong>Bảng Đáp Án Đề Thi</strong> bên dưới thì mới được lưu đề thi vào CSDL Firebase.
+                    {' '}Theo quy định, bạn phải điền đáp án cho tất cả {parsedData.questions?.length || 50} câu hỏi tại <strong>Bảng Đáp Án Đề Thi</strong> bên dưới để hoàn tất lưu đề thi.
                   </p>
                 </div>
               </div>
@@ -1119,7 +1125,7 @@ function UploadContent() {
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                   <span className="text-xs sm:text-sm font-medium">
-                    Đã hoàn thành 100% đáp án cho toàn bộ {parsedData.questions?.length || 50} câu hỏi. Khi bấm <strong>"Lưu Ngân hàng Đề"</strong>, hệ thống sẽ tự động tải file PDF của bạn lên đám mây <strong>Backblaze B2</strong> và lưu đề vào CSDL Firebase.
+                    Đã hoàn thành 100% đáp án cho toàn bộ {parsedData.questions?.length || 50} câu hỏi. Khi bấm <strong>"Lưu Ngân hàng Đề"</strong>, hệ thống sẽ tự động lưu trữ tệp PDF và đưa đề thi vào kho đề của bạn.
                   </span>
                 </div>
                 <button
@@ -1145,11 +1151,11 @@ function UploadContent() {
                           : 'Đề thi & Tệp PDF đã được lưu trữ thành công!'}
                       </span>
                       <span className="text-xs text-emerald-800">
-                        Mã đề: <strong>{savedExamId}</strong> &bull; Gắn với ID tài khoản:{' '}
-                        <strong className="font-mono text-emerald-950">
-                          {candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || 'Tạm thời'}
+                        Mã đề: <strong>{savedExamId}</strong> &bull; Tài khoản:{' '}
+                        <strong className="text-emerald-950">
+                          {candidate?.fullName || candidate?.username || (candidate?.sbd && candidate.sbd.length <= 15 ? `SBD ${candidate.sbd}` : '') || candidate?.email || 'Tài khoản của bạn'}
                         </strong>
-                        {' '}&bull; Quyền: <strong>Chỉ tài khoản của bạn xem được</strong>
+                        {' '}&bull; Quyền truy cập: <strong>Riêng tư (Chỉ bạn xem được)</strong>
                       </span>
                     </div>
                   </div>
@@ -1186,7 +1192,7 @@ function UploadContent() {
                     <div className="flex items-center gap-2 text-emerald-900">
                       <Cloud className="w-4 h-4 text-emerald-700" />
                       <span>
-                        File PDF gốc đã lưu an toàn trên <strong>Backblaze B2</strong> (Bucket: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono font-bold text-emerald-900">file-vb2</code>). Mọi chỉnh sửa nội dung sẽ <strong>chỉ cập nhật dữ liệu đề thi mà không tải lại file PDF cũ</strong>, tránh spam trùng lặp.
+                        Tệp PDF gốc đã được lưu an toàn trên hệ thống. Mọi chỉnh sửa nội dung sẽ <strong>chỉ cập nhật dữ liệu đề thi mà không tải lại tệp PDF cũ</strong>.
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1198,7 +1204,7 @@ function UploadContent() {
                           className="font-bold text-emerald-800 hover:text-emerald-950 underline flex items-center gap-1"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Xem PDF Đề thi gốc trên B2</span>
+                          <span>Xem tệp PDF Đề thi gốc</span>
                         </a>
                       )}
                       {(uploadedB2Files?.answerPdfUrl || parsedData.answerPdfFileUrl) && (
@@ -1209,7 +1215,7 @@ function UploadContent() {
                           className="font-bold text-blue-800 hover:text-blue-950 underline flex items-center gap-1"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Xem PDF Đáp án trên B2</span>
+                          <span>Xem tệp PDF Đáp án gốc</span>
                         </a>
                       )}
                     </div>

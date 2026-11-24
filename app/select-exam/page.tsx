@@ -196,12 +196,18 @@ export default function SelectExamPage() {
               <div>
                 <div className="font-extrabold text-[#0f2d22] flex items-center gap-2">
                   <span>Tài khoản: {candidate.fullName || candidate.username || 'Thí sinh'}</span>
-                  <span className="font-mono text-[11px] bg-emerald-200/80 text-emerald-950 font-bold px-2 py-0.5 rounded-lg">
-                    ID: {currentUserId}
-                  </span>
+                  {candidate.sbd && candidate.sbd.length <= 15 ? (
+                    <span className="font-mono text-[11px] bg-emerald-200/80 text-emerald-950 font-bold px-2 py-0.5 rounded-lg">
+                      SBD: {candidate.sbd}
+                    </span>
+                  ) : candidate.email ? (
+                    <span className="text-[11px] bg-emerald-200/80 text-emerald-950 font-medium px-2 py-0.5 rounded-lg">
+                      {candidate.email}
+                    </span>
+                  ) : null}
                 </div>
                 <p className="text-emerald-800 text-xs mt-0.5">
-                  Đang hiển thị các đề thi bạn đã upload độc quyền cùng với các đề mẫu chuẩn của Bộ Công An.
+                  Đang hiển thị các đề thi của bạn cùng với các bộ đề thi chuẩn của Bộ Công An.
                 </p>
               </div>
             </div>
@@ -403,7 +409,7 @@ export default function SelectExamPage() {
                     {exam.pdfFileUrl && (
                       <div className="pt-2 flex items-center justify-between text-[11px] text-emerald-800 bg-emerald-50/70 p-2 rounded-xl border border-emerald-100">
                         <span className="flex items-center gap-1 font-semibold text-emerald-950">
-                          <Cloud className="w-3.5 h-3.5 text-emerald-700" /> File PDF gốc (B2)
+                          <Cloud className="w-3.5 h-3.5 text-emerald-700" /> Tệp PDF đề thi gốc
                         </span>
                         <a
                           href={exam.pdfFileUrl}

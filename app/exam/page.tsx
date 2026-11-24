@@ -180,7 +180,7 @@ function ExamContent() {
 
       if (!ignore) {
         setLoadError(
-          'Không tìm thấy đề thi này trong Firebase hoặc bạn chưa đăng nhập tài khoản sở hữu đề thi.'
+          'Không tìm thấy đề thi này trên hệ thống hoặc bạn chưa đăng nhập tài khoản sở hữu đề thi.'
         );
         setIsLoadingExam(false);
       }
@@ -1051,7 +1051,7 @@ function ExamContent() {
                 Đang chấm điểm & Lưu bài thi
               </h3>
               <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                Hệ thống đang đồng bộ kết quả làm bài của bạn lên cơ sở dữ liệu <strong>Firebase</strong>. Vui lòng chờ trong giây lát...
+                Hệ thống đang lưu kết quả làm bài của bạn lên hệ thống an toàn. Vui lòng chờ trong giây lát...
               </p>
             </div>
           </div>

@@ -94,7 +94,7 @@ export async function GET(request: Request) {
 
     if (!userDoc) {
       return NextResponse.json(
-        { error: 'Không tìm thấy hồ sơ người dùng trong Firebase.' },
+        { error: 'Không tìm thấy hồ sơ người dùng trong hệ thống.' },
         { status: 404 }
       );
     }

@@ -152,7 +152,7 @@ export default function ProfilePage() {
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
     } catch (err: any) {
-      setSaveError(err?.message || 'Có lỗi khi lưu vào Firebase.');
+      setSaveError(err?.message || 'Có lỗi khi lưu thông tin. Vui lòng thử lại.');
     } finally {
       setIsSaving(false);
     }
@@ -240,7 +240,7 @@ export default function ProfilePage() {
           {isSaved && (
             <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 text-xs sm:text-sm flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Đã lưu thành công thông tin vào cơ sở dữ liệu Firebase!</span>
+              <span>Đã cập nhật thông tin tài khoản thành công!</span>
             </div>
           )}
 
@@ -305,10 +305,10 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Số báo danh (SBD) / Mã định danh */}
+              {/* Số báo danh (SBD) */}
               <div>
                 <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                  Số báo danh (SBD) / Mã định danh
+                  Số báo danh (SBD)
                 </label>
                 <input
                   type="text"
