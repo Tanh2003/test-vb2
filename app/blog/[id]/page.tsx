@@ -222,15 +222,13 @@ function BlogDetailInner({ id: postId }: { id: string }) {
         </div>
 
         {/* Ảnh bìa lớn */}
-        {post.coverImage && (
-          <div className="rounded-3xl overflow-hidden shadow-md max-h-[440px] w-full bg-slate-100 border border-slate-200">
-            <img
-              src={post.coverImage}
-              alt={post.title}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )}
+        <div className="rounded-3xl overflow-hidden shadow-md max-h-[440px] w-full bg-slate-100 border border-slate-200">
+          <img
+            src={post.coverImage || '/blog-default.png'}
+            alt={post.title}
+            className="w-full h-full object-cover"
+          />
+        </div>
 
         {/* Nội dung chi tiết bài viết */}
         <article className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-sm text-slate-800 leading-relaxed space-y-4">

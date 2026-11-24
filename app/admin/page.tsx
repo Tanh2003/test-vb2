@@ -212,7 +212,7 @@ export default function AdminDashboardPage() {
       category: 'TIN_TUYEN_SINH',
       summary: '',
       content: '',
-      coverImage: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200&q=80',
+      coverImage: '/blog-default.png',
       author: candidate?.fullName || candidate?.username || 'Ban Quản Trị',
       authorRole: 'Admin',
       isPublished: true,

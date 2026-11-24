@@ -49,7 +49,7 @@ Thí sinh thực hiện 01 bài thi tổng hợp kéo dài **150 phút**, thang 
 ## 3. Lời khuyên ôn tập từ Ban Quản Trị
 
 Thí sinh nên luyện tập bấm giờ 150 phút thực tế trên hệ thống **onthivb2.io.vn** để rèn luyện thói quen phân bổ thời gian: dành 45-50 phút cho bài viết tự luận và 90-100 phút cho các câu hỏi chuyên ngành.`,
-    coverImage: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200&q=80',
+    coverImage: '/blog-tuyen-sinh.png',
     category: 'TIN_TUYEN_SINH',
     author: 'Ban Quản Trị Tuyển Sinh CAND',
     authorRole: 'Admin',
@@ -78,7 +78,7 @@ Hệ thống phòng thi trực tuyến của onthivb2.io.vn có bộ đếm từ
   - *Bình luận & Phân tích:* Nêu nguyên nhân, thực trạng và ý nghĩa của vấn đề. Đưa ra ít nhất 2 dẫn chứng thực tế thuyết phục (ví dụ: tinh thần phụng sự của lực lượng vũ trang nhân dân, công cuộc chuyển đổi số quốc gia, giữ gìn an ninh mạng...).
   - *Phản đề & Mở rộng:* Phê phán các hiện tượng tiêu cực, lệch lạc, thiếu trách nhiệm đối với cộng đồng.
 - **Kết bài (khoảng 60 - 80 từ):** Khái quát lại bài học nhận thức và liên hệ hành động cụ thể của bản thân khi đứng trước nguyện vọng cống hiến cho Tổ quốc và lực lượng Công an nhân dân.`,
-    coverImage: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80',
+    coverImage: '/blog-tu-luan.png',
     category: 'KINH_NGHIEM_THI',
     author: 'Tổ Chuyên Môn Lý Luận Chính Trị',
     authorRole: 'Admin',
@@ -109,7 +109,7 @@ Mã đề CA1 gồm **45 câu trắc nghiệm khách quan** và **5 câu trả l
    - Phương trình vi phân cấp 1 và cấp 2 hệ số hằng.
 
 Hệ thống đã hỗ trợ hiển thị công thức toán học định dạng LaTeX sắc nét trên cả máy tính và điện thoại để thí sinh ôn tập thuận tiện nhất.`,
-    coverImage: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=1200&q=80',
+    coverImage: '/blog-ca1.png',
     category: 'QUY_CHE_ON_THI',
     author: 'Ban Giảng Viên Khối Tự Nhiên',
     authorRole: 'Admin',
@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
       title,
       summary: summary || title,
       content,
-      coverImage: coverImage || 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200&q=80',
+      coverImage: coverImage || '/blog-default.png',
       category,
       author,
       authorRole,

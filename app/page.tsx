@@ -644,15 +644,13 @@ export default function HomePage() {
                   className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition"
                 >
                   <div>
-                    {b.coverImage && (
-                      <div className="h-36 w-full relative overflow-hidden bg-slate-100">
-                        <img
-                          src={b.coverImage}
-                          alt={b.title}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
+                    <div className="h-36 w-full relative overflow-hidden bg-slate-100">
+                      <img
+                        src={b.coverImage || '/blog-default.png'}
+                        alt={b.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                     <div className="p-4 space-y-1.5">
                       <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">
                         {b.category === 'TIN_TUYEN_SINH'

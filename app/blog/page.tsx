@@ -169,7 +169,7 @@ export default function BlogListingPage() {
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden grid grid-cols-1 lg:grid-cols-12 hover:shadow-md transition">
                 <div className="lg:col-span-7 h-64 sm:h-80 lg:h-full relative overflow-hidden bg-slate-100">
                   <img
-                    src={featuredPost.coverImage || 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200&q=80'}
+                    src={featuredPost.coverImage || '/blog-tuyen-sinh.png'}
                     alt={featuredPost.title}
                     className="w-full h-full object-cover"
                   />
@@ -234,7 +234,7 @@ export default function BlogListingPage() {
                     <div>
                       <div className="h-44 w-full relative overflow-hidden bg-slate-100">
                         <img
-                          src={post.coverImage || 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200&q=80'}
+                          src={post.coverImage || '/blog-default.png'}
                           alt={post.title}
                           className="w-full h-full object-cover"
                         />
