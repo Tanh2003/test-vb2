@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
   },
 // Ép Next.js biên dịch lại các thư viện gây xung đột ESM/CommonJS
   transpilePackages: ['jwks-rsa', 'jose'],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push('firebase-admin');
+    }
+    return config;
+  },
 };
 
 
