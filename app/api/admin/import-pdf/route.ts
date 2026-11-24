@@ -27,7 +27,7 @@ const ai = new GoogleGenAI({ apiKey });
 const FIREBASE_DB_URL =
   'https://exam-vb2-default-rtdb.asia-southeast1.firebasedatabase.app';
 
-export const maxDuration = 600; // 120s timeout for multi-page PDF processing
+export const maxDuration = 300; // 120s timeout for multi-page PDF processing
 
 // Danh sách model ưu tiên cao nhất: Khả dụng thực tế, tốc độ phản hồi nhanh, không lỗi 404
 const candidateModels = [
