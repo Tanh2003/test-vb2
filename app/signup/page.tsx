@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 function SignupForm() {
   const router = useRouter();
@@ -16,18 +16,26 @@ function SignupForm() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !email || !password) {
-      setError('Vui lòng điền đầy đủ Tên tài khoản, Gmail và Mật khẩu.');
+    if (!username || !email || !password || !confirmPassword) {
+      setError('Vui lòng điền đầy đủ Tên tài khoản, Gmail, Mật khẩu và Nhập lại mật khẩu.');
       return;
     }
 
     if (password.length < 6) {
       setError('Mật khẩu phải có tối thiểu 6 ký tự.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Mật khẩu nhập lại không khớp. Vui lòng kiểm tra lại.');
       return;
     }
 
@@ -171,6 +179,7 @@ function SignupForm() {
               <input
                 type="text"
                 required
+                  placeholder="Nhập tên tài khoản"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-[#0f2d22] focus:ring-1 focus:ring-[#0f2d22] text-slate-800 text-sm transition"
@@ -184,6 +193,7 @@ function SignupForm() {
               <input
                 type="tel"
                 value={phone}
+                  placeholder="Nhập số điện thoại"
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-[#0f2d22] focus:ring-1 focus:ring-[#0f2d22] text-slate-800 text-sm transition"
               />
@@ -196,6 +206,7 @@ function SignupForm() {
               <input
                 type="email"
                 required
+                 placeholder="Nhập gmail"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-[#0f2d22] focus:ring-1 focus:ring-[#0f2d22] text-slate-800 text-sm transition"
@@ -206,13 +217,50 @@ function SignupForm() {
               <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
                 Mật khẩu
               </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-[#0f2d22] focus:ring-1 focus:ring-[#0f2d22] text-slate-800 text-sm transition"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Tối thiểu 6 ký tự"
+                  className="w-full px-4 py-2.5 sm:py-3 pr-11 rounded-xl border border-slate-300 focus:outline-none focus:border-[#0f2d22] focus:ring-1 focus:ring-[#0f2d22] text-slate-800 text-sm transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 cursor-pointer transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
+                Nhập lại mật khẩu
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu"
+                  className="w-full px-4 py-2.5 sm:py-3 pr-11 rounded-xl border border-slate-300 focus:outline-none focus:border-[#0f2d22] focus:ring-1 focus:ring-[#0f2d22] text-slate-800 text-sm transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 cursor-pointer transition-colors"
+                  tabIndex={-1}
+                  aria-label={showConfirmPassword ? 'Ẩn mật khẩu nhập lại' : 'Hiện mật khẩu nhập lại'}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             {/* Nút Đăng ký đỏ */}

@@ -526,26 +526,27 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
                     : 'bg-amber-50/80 border-amber-300 ring-1 ring-amber-300'
                 }`}
               >
-                <div className="flex items-center justify-between text-[11px] font-bold">
+                <div className="flex items-center justify-between gap-1 text-[11px] font-bold min-w-0">
                   <button
                     type="button"
                     onClick={() => {
                       const el = document.getElementById(`question-card-${q.number}`);
                       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
-                    className="text-[#0f2d22] hover:underline cursor-pointer"
+                    className="text-[#0f2d22] hover:underline cursor-pointer shrink-0 font-extrabold"
                     title={`Cuộn đến Câu ${q.number}`}
                   >
                     C.{q.number}
                   </button>
                   <span
-                    className={`text-[9px] uppercase px-1 rounded ${
+                    title={hasAns ? `Đáp án: ${q.correctAnswer}` : 'Chưa có đáp án'}
+                    className={`text-[9px] px-1.5 py-0.5 rounded truncate max-w-[48px] inline-block text-right ${
                       hasAns
                         ? 'bg-emerald-200/60 text-emerald-900 font-bold'
-                        : 'bg-amber-200 text-amber-900 font-extrabold'
+                        : 'bg-amber-200 text-amber-900 font-extrabold shrink-0'
                     }`}
                   >
-                    {hasAns ? q.correctAnswer : 'Thiếu'}
+                    {hasAns ? (q.correctAnswer || '').replace(/\s+/g, ' ').trim() : 'Thiếu'}
                   </span>
                 </div>
 
@@ -567,14 +568,15 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
                     ))}
                   </div>
                 ) : (
-                  <input
-                    type="text"
+                  <textarea
+                    rows={2}
                     value={q.correctAnswer || ''}
                     onChange={(e) =>
                       updateQuestion(originalIdx, { correctAnswer: e.target.value })
                     }
-                    placeholder={q.type === 'short_numeric' ? 'Số...' : 'Chữ...'}
-                    className="w-full text-[10px] font-mono bg-white border border-slate-300 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:border-emerald-600"
+                    placeholder={q.type === 'short_numeric' ? 'Điền số...' : 'Điền chữ...'}
+                    title={q.correctAnswer || (q.type === 'short_numeric' ? 'Điền đáp án số' : 'Điền đáp án chữ')}
+                    className="w-full text-[10px] font-mono bg-white border border-slate-300 rounded px-1.5 py-1 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 resize-none min-h-[38px] leading-tight"
                   />
                 )}
               </div>
@@ -931,16 +933,16 @@ export const ParsedExamPreview: React.FC<Props> = ({ data, onChange }) => {
                 {/* Dạng Khái niệm (short_text) */}
                 {q.type === 'short_text' && (
                   <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center gap-4 text-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-extrabold text-amber-900 text-sm">Từ khoá / Khái niệm:</span>
-                      <input
-                        type="text"
+                    <div className="flex items-start gap-2.5 w-full sm:w-auto">
+                      <span className="font-extrabold text-amber-900 text-sm shrink-0 pt-1.5">Từ khoá / Khái niệm:</span>
+                      <textarea
+                        rows={2}
                         value={q.correctAnswer || ''}
                         onChange={(e) =>
                           updateQuestion(originalIdx, { correctAnswer: e.target.value })
                         }
-                        placeholder="VD: Thực tiễn, Vi phạm pháp luật"
-                        className="bg-white border border-amber-300 rounded-xl px-4 py-2 text-sm font-bold text-amber-950 w-72 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
+                        placeholder="VD: Thực tiễn, Vi phạm pháp luật..."
+                        className="bg-white border border-amber-300 rounded-xl px-3.5 py-2 text-sm font-bold text-amber-950 w-full sm:w-96 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs resize-y min-h-[44px]"
                       />
                     </div>
                     <span className="text-slate-500 text-xs">
