@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Shield,
   BookOpen,
@@ -132,35 +133,50 @@ export default function AboutPage() {
           </svg>
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10 space-y-6">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-900/80 border border-emerald-700/60 text-amber-300 text-xs font-bold uppercase tracking-wider">
-            <Shield className="w-4 h-4 text-amber-400" />
-            <span>Hệ Thống Luyện Thi Trực Tuyến Chuyên Biệt CAND</span>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="space-y-6 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-900/80 border border-emerald-700/60 text-amber-300 text-xs font-bold uppercase tracking-wider">
+              <Shield className="w-4 h-4 text-amber-400" />
+              <span>Hệ Thống Luyện Thi Trực Tuyến Chuyên Biệt CAND</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+              Nền Tảng Luyện Thi Tuyển Sinh Văn Bằng 2 Công An Nhân Dân
+            </h1>
+
+            <p className="text-sm sm:text-base text-emerald-100/90 leading-relaxed font-normal">
+              <strong>onthivb2.io.vn</strong> được xây dựng nhằm chuẩn hoá lộ trình ôn luyện, mô phỏng 100% cấu trúc đề thi chính thức của Bộ Công An, tích hợp công nghệ AI bóc tách đề thi PDF và hệ thống phòng thi ảo đạt chuẩn chất lượng cao.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                href="/select-exam"
+                className="px-6 py-3 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-sm shadow-md transition active:scale-[0.98] flex items-center gap-2"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Khám phá Ngân hàng đề thi</span>
+              </Link>
+              <Link
+                href="/import"
+                className="px-6 py-3 rounded-xl bg-emerald-900/80 hover:bg-emerald-900 text-amber-300 border border-emerald-700 font-bold text-sm transition flex items-center gap-2"
+              >
+                <Cpu className="w-4 h-4 text-amber-400" />
+                <span>Trải nghiệm AI Bóc tách PDF</span>
+              </Link>
+            </div>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight max-w-3xl">
-            Nền Tảng Luyện Thi Tuyển Sinh Văn Bằng 2 Công An Nhân Dân
-          </h1>
-
-          <p className="text-sm sm:text-base text-emerald-100/90 leading-relaxed max-w-2xl font-normal">
-            <strong>onthivb2.io.vn</strong> được xây dựng nhằm chuẩn hoá lộ trình ôn luyện, mô phỏng 100% cấu trúc đề thi chính thức của Bộ Công An, tích hợp công nghệ AI bóc tách đề thi PDF và hệ thống phòng thi ảo đạt chuẩn chất lượng cao.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Link
-              href="/select-exam"
-              className="px-6 py-3 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white font-bold text-sm shadow-md transition active:scale-[0.98] flex items-center gap-2"
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>Khám phá Ngân hàng đề thi</span>
-            </Link>
-            <Link
-              href="/import"
-              className="px-6 py-3 rounded-xl bg-emerald-900/80 hover:bg-emerald-900 text-amber-300 border border-emerald-700 font-bold text-sm transition flex items-center gap-2"
-            >
-              <Cpu className="w-4 h-4 text-amber-400" />
-              <span>Trải nghiệm AI Bóc tách PDF</span>
-            </Link>
+          <div className="shrink-0 flex items-center justify-center">
+            <div className="relative p-3 rounded-3xl bg-emerald-900/40 border border-emerald-700/50 shadow-2xl backdrop-blur-xs">
+              <Image
+                src="/logo.png"
+                alt="Logo CAND VB2"
+                width={180}
+                height={180}
+                className="w-36 h-36 sm:w-44 sm:h-44 object-contain drop-shadow-2xl"
+                priority
+              />
+            </div>
           </div>
         </div>
       </section>

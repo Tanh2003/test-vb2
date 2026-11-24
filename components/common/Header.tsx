@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import {
@@ -50,22 +51,18 @@ interface HeaderProps {
   rightContent?: React.ReactNode;
 }
 
-// ===================== Logo SVG (Shield + Star) =====================
-function LogoSvg() {
+// ===================== Logo (Website & Brand) =====================
+function LogoSvg({ className = 'w-9 h-9 sm:w-10 sm:h-10' }: { className?: string }) {
   return (
-    <div className="w-9 h-9 sm:w-10 sm:h-10 relative flex items-center justify-center shrink-0">
-      <svg viewBox="0 0 36 42" className="w-full h-full drop-shadow">
-        <path
-          d="M18 1L33 6.5V20C33 30 26 38 18 41C10 38 3 30 3 20V6.5L18 1Z"
-          fill="#C1121F"
-          stroke="#FBBF24"
-          strokeWidth="2.5"
-        />
-        <polygon
-          points="18,10 20.8,16.5 27.5,17 22.5,21.5 24,28 18,24.5 12,28 13.5,21.5 8.5,17 15.2,16.5"
-          fill="#FBBF24"
-        />
-      </svg>
+    <div className={`${className} relative flex items-center justify-center shrink-0`}>
+      <Image
+        src="/logo.png"
+        alt="Logo Thi Online VB2 CAND"
+        width={44}
+        height={44}
+        className="w-full h-full object-contain drop-shadow shrink-0"
+        priority
+      />
     </div>
   );
 }

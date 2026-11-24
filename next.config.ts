@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
    logging: {
     browserToTerminal: false, // Tắt in cảnh báo [browser] ra terminal
   },
+   serverExternalPackages: ["firebase-admin", "jwks-rsa", "jose"],
 };
+
 
 export default nextConfig;
