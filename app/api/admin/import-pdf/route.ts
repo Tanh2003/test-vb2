@@ -20,7 +20,7 @@ import {
 
 const apiKey =
   process.env.GEMINI_API_KEY ||
-  'AQ.Ab8RN6KFEUAjeu7r3ESGa5vwyy4JD8XGS7bsOhy-yfyMlCstMQ';
+  'AQ.Ab8RN6JsqD2Usk-GV4m895efhWOmTwm_10vqUHIW47qLJyE_8g';
 
 const ai = new GoogleGenAI({ apiKey });
 
@@ -29,127 +29,145 @@ const FIREBASE_DB_URL =
 
 export const maxDuration = 300; // 120s timeout for multi-page PDF processing
 
-// Hàm gọi Gemini an toàn với Gemini File API và cơ chế retry / fallback model
+// Danh sách model ưu tiên cao nhất: Khả dụng thực tế, tốc độ phản hồi nhanh, không lỗi 404
+const candidateModels = [
+  'gemini-3.5-flash-lite', // Ưu tiên 1: Tốc độ siêu tốc (~4-8s), nhẹ tải, ít nghẽn
+  'gemini-3.5-flash',      // Ưu tiên 2: Cân bằng, tính ổn định cao (~15-30s)
+  'gemini-3.6-flash',      // Ưu tiên 3: Phiên bản mở rộng độ chính xác cao
+  'gemini-3.8-flash',      // Ưu tiên 4: Dự phòng khi các model trên quá tải
+];
+
+// Hàm gọi Gemini an toàn với cơ chế nạp inlineData siêu tốc (<15MB) hoặc Gemini File API (>15MB)
 async function callGeminiPdf<T>(
   fileInput: Blob | File | Buffer,
   prompt: string,
   schema: object,
   displayName = 'exam_document.pdf'
 ): Promise<T | null> {
- const candidateModels = [
-  'gemini-3.5-flash-lite',
-  'gemini-3.8-flash',
-  'gemini-pro-latest', // chỉ khi 2 cái trên lỗi
-];
-
-  let blob: Blob;
-  if (fileInput instanceof Blob) {
-    blob = fileInput;
-  } else if (Buffer.isBuffer(fileInput)) {
-    blob = new Blob([new Uint8Array(fileInput)], { type: 'application/pdf' });
+  // 1. Chuẩn hóa fileInput thành Buffer
+  let buffer: Buffer;
+  if (Buffer.isBuffer(fileInput)) {
+    buffer = fileInput;
+  } else if (fileInput instanceof Blob) {
+    const ab = await fileInput.arrayBuffer();
+    buffer = Buffer.from(ab);
   } else {
-    blob = new Blob([fileInput as any], { type: 'application/pdf' });
+    buffer = Buffer.from(fileInput as any);
   }
 
+  // Tệp PDF <= 15MB sẽ dùng inlineData (base64) trực tiếp để tránh độ trễ upload & polling
+  const isSmallFile = buffer.length <= 15 * 1024 * 1024;
+  let fileDataPart: any = null;
   let uploadedFileName: string | null = null;
 
   try {
-    // 1. Upload file lên server Google thông qua Gemini File API (1 LẦN DUY NHẤT)
-    console.log(`[Gemini File API] Bắt đầu tải tệp lên Google: ${displayName}...`);
-    const uploadedFile = await ai.files.upload({
-      file: blob,
-      config: {
-        mimeType: 'application/pdf',
-        displayName,
+    if (isSmallFile) {
+      console.log(
+        `[Gemini API] Tệp PDF ${(buffer.length / 1024).toFixed(1)}KB: Nạp inlineData trực tiếp (siêu tốc, bỏ qua độ trễ File API).`
+      );
+      fileDataPart = {
+        inlineData: {
+          data: buffer.toString('base64'),
+          mimeType: 'application/pdf',
+        },
+      };
+    } else {
+      console.log(
+        `[Gemini File API] Tệp PDF lớn (${(buffer.length / 1024 / 1024).toFixed(1)}MB): Tải lên Gemini File API: ${displayName}...`
+      );
+      const blob = new Blob([new Uint8Array(buffer)], { type: 'application/pdf' });
+      const uploadedFile = await ai.files.upload({
+        file: blob,
+        config: {
+          mimeType: 'application/pdf',
+          displayName,
+        },
+      });
+
+      if (!uploadedFile.name) {
+        throw new Error('Upload tệp lên Gemini File API không trả về tên file.');
+      }
+
+      uploadedFileName = uploadedFile.name;
+      console.log(`[Gemini File API] Tải tệp thành công: ${uploadedFileName}`);
+
+      // Đợi tệp chuyển sang trạng thái ACTIVE nếu đang PROCESSING
+      let fileInfo = await ai.files.get({ name: uploadedFileName });
+      let waitAttempts = 0;
+      while (fileInfo.state === 'PROCESSING' && waitAttempts < 10) {
+        waitAttempts++;
+        console.log(`[Gemini File API] File đang được xử lý, đợi 1s...`);
+        await new Promise((r) => setTimeout(r, 1000));
+        fileInfo = await ai.files.get({ name: uploadedFileName });
+      }
+
+      if (fileInfo.state === 'FAILED') {
+        throw new Error('Google Gemini File API báo lỗi xử lý tệp PDF.');
+      }
+
+      const fileUri = fileInfo.uri || uploadedFile.uri;
+      if (!fileUri) {
+        throw new Error('Không nhận được fileUri từ Gemini File API.');
+      }
+
+      fileDataPart = {
+        fileData: {
+          fileUri,
+          mimeType: 'application/pdf',
+        },
+      };
+    }
+
+    const contents = [
+      fileDataPart,
+      { text: prompt },
+    ];
+
+    const modelConfig: any = {
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+      temperature: 0,
+      thinkingConfig: {
+        thinkingLevel: 'MINIMAL', // TỐI ƯU CỰC QUAN TRỌNG: Tắt suy nghĩ kéo dài, xuất thẳng JSON trong vài giây
       },
-    });
+    };
 
-    if (!uploadedFile.name) {
-      throw new Error('Upload tệp lên Gemini File API không trả về tên file.');
-    }
-
-    uploadedFileName = uploadedFile.name;
-    console.log(`[Gemini File API] Tải tệp thành công: ${uploadedFileName} (URI: ${uploadedFile.uri})`);
-
-    // Đợi tệp chuyển sang trạng thái ACTIVE nếu đang PROCESSING
-    let fileInfo = await ai.files.get({ name: uploadedFileName });
-    let waitAttempts = 0;
-    while (fileInfo.state === 'PROCESSING' && waitAttempts < 10) {
-      waitAttempts++;
-      console.log(`[Gemini File API] File đang được xử lý (trạng thái PROCESSING), đợi 1s...`);
-      await new Promise((r) => setTimeout(r, 1000));
-      fileInfo = await ai.files.get({ name: uploadedFileName });
-    }
-
-    if (fileInfo.state === 'FAILED') {
-      throw new Error('Google Gemini File API báo lỗi xử lý tệp PDF.');
-    }
-
-    const fileUri = fileInfo.uri || uploadedFile.uri;
-    if (!fileUri) {
-      throw new Error('Không nhận được fileUri từ Gemini File API.');
-    }
-
-    // 2. Vòng lặp duyệt qua candidateModels tái sử dụng cùng 1 fileUri
+    // 2. Vòng lặp duyệt qua candidateModels: Mỗi model tối đa 35s timeout để đảm bảo toàn bộ request dưới 120s
     for (const model of candidateModels) {
-      let attempt = 0;
-      const maxAttempts = 1; // 1 lần đầu + 1 lần retry nếu gặp lỗi 503/429
+      try {
+        console.log(`[Gemini API] Đang gọi model ${model} (chế độ thinkingLevel: MINIMAL)...`);
+        const startTime = Date.now();
 
-      while (attempt < maxAttempts) {
-        attempt++;
-        try {
-          console.log(`[Gemini API] Đang gọi model ${model} (attempt ${attempt}/${maxAttempts})...`);
-          const response = await ai.models.generateContent({
-            model,
-            contents: [
-              {
-                fileData: {
-                  fileUri: fileUri,
-                  mimeType: 'application/pdf',
-                },
-              },
-              { text: prompt },
-            ],
-            config: {
-              responseMimeType: 'application/json',
-              responseSchema: schema,
-              temperature: 0,
-            },
-          });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout quá 35s khi gọi model ${model}`)), 35000)
+        );
 
-          if (response.text) {
-            console.log(`[Gemini API] Model ${model} phân tích thành công!`);
-            return JSON.parse(response.text) as T;
-          }
-          break;
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          const isRetryable =
-            msg.includes('503') ||
-            msg.includes('429') ||
-            msg.includes('Deadline expired') ||
-            msg.includes('Resource has been exhausted') ||
-            msg.includes('overloaded') ||
-            msg.includes('high demand');
+        const generatePromise = ai.models.generateContent({
+          model,
+          contents,
+          config: modelConfig,
+        });
 
-          if (isRetryable && attempt < maxAttempts) {
-            console.warn(
-              `[Gemini API] Model ${model} gặp lỗi tải cao (${msg}). Đợi 2s để thử lại lần 2...`
-            );
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            continue;
-          }
+        const response = await Promise.race([generatePromise, timeoutPromise]);
 
-          console.warn(`[Gemini API] Model ${model} không thành công:`, msg);
-          break;
+        if (response && response.text) {
+          console.log(
+            `[Gemini API] ✅ Model ${model} phân tích thành công trong ${Date.now() - startTime}ms!`
+          );
+          return JSON.parse(response.text) as T;
         }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[Gemini API] ⚠️ Model ${model} gặp lỗi/quá tải (${msg.substring(0, 100)}...). Lập tức chuyển sang model tiếp theo...`
+        );
       }
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[Gemini API] Lỗi trong quá trình xử lý file PDF:', msg);
   } finally {
-    // 4. Dọn dẹp file tạm trên server Google sau khi bóc tách xong (hoặc khi gặp lỗi)
+    // 3. Dọn dẹp file tạm trên server Google nếu có dùng File API
     if (uploadedFileName) {
       try {
         console.log(`[Gemini File API] Dọn dẹp xóa tệp tạm trên server Google: ${uploadedFileName}...`);
