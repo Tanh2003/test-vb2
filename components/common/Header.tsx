@@ -66,9 +66,10 @@ function LogoSvg() {
 // ===================== NAV ITEMS CONFIG =====================
 const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Thư viện đề' },
+  { href: '/select-exam', label: 'Ngân hàng đề thi' },
+  { href: '/about', label: 'Giới thiệu' },
   { href: '/import', label: 'Upload đề', requireAuth: true },
   { href: '/upload-history', label: 'Lịch sử upload', requireAuth: true },
-  { href: '/select-exam', label: 'Ngân hàng đề thi' },
   { href: '/result', label: 'Lịch sử làm đề', requireAuth: true },
 ];
 
