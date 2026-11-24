@@ -100,23 +100,42 @@ export async function POST(request: Request) {
       }
     }
 
-    // 6. Lưu hồ sơ người dùng vào collection `users` trong Firestore với trạng thái isVerified = true
+    // 6. Lưu hồ sơ người dùng vào collection `users` trong Firestore với trạng thái isVerified = true và MẬT KHẨU
     const nowIso = new Date().toISOString();
     const userProfile = {
       uid: userRecord.uid,
       email: userData.email,
       username: userData.username,
       fullName: userData.username,
+      password: userData.password, // Lưu mật khẩu để xác thực đăng nhập
       sbd: userData.username.toUpperCase(),
       phone: userData.phone || '',
       role: 'candidate',
+      examCode: 'CA1',
+      freeUploadsRemaining: 2,
       isVerified: true,
       emailVerified: true,
       createdAt: nowIso,
       updatedAt: nowIso,
+      lastLoginAt: nowIso,
     };
 
     await adminDb.collection('users').doc(userRecord.uid).set(userProfile, { merge: true });
+
+    // Đồng bộ sang Realtime Database nếu có cấu hình
+    const rtdbUrl = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL;
+    if (rtdbUrl) {
+      try {
+        await fetch(`${rtdbUrl}/users/${userRecord.uid}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userProfile),
+          signal: AbortSignal.timeout(3000),
+        });
+      } catch (rtdbErr) {
+        console.warn('Lỗi đồng bộ RTDB dự phòng khi verify OTP:', rtdbErr);
+      }
+    }
 
     // 7. Xoá bản ghi OTP sau khi đã sử dụng thành công
     await otpDocRef.delete();
