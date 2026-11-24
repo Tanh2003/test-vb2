@@ -3,12 +3,14 @@ import { adminDb } from '@/lib/firebase-admin';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://onthivb2.io.vn';
 const FIREBASE_DB_URL =
+  process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
   'https://exam-vb2-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  // 1. Danh sách các trang cố định quan trọng (Trang chủ, Ngân hàng đề thi, các ca thi chuẩn)
+  // 1. Danh sách các trang CÔNG KHAI cố định
+  // LƯU Ý: Tuyệt đối không đưa các trang cần đăng nhập (/profile, /admin, /import, /upload-history, /result, /login, /register, /signup)
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: BASE_URL,
@@ -61,7 +63,84 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // 2. Lấy danh sách đề thi công khai từ Firebase (Realtime Database & Firestore)
+  // 2. Danh sách bài viết Blog công khai (Tối ưu SEO Google)
+  const blogRoutes: MetadataRoute.Sitemap = [];
+  const processedBlogIds = new Set<string>();
+
+  // A. Lấy bài viết công khai từ Firebase Realtime Database
+  try {
+    const res = await fetch(`${FIREBASE_DB_URL}/blogs.json`, {
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data === 'object') {
+        Object.keys(data).forEach((key) => {
+          const item = data[key];
+          if (item && item.isPublished !== false) {
+            const blogId = item.id || key;
+            processedBlogIds.add(blogId);
+            const lastMod = item.updatedAt || item.createdAt;
+            blogRoutes.push({
+              url: `${BASE_URL}/blog/${encodeURIComponent(blogId)}`,
+              lastModified: lastMod ? new Date(lastMod) : now,
+              changeFrequency: 'weekly',
+              priority: 0.8,
+            });
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[Sitemap] Lỗi lấy bài viết blog từ RTDB:', err);
+  }
+
+  // B. Bổ sung bài viết từ Firestore nếu chưa có
+  try {
+    if (adminDb) {
+      const snapshot = await adminDb
+        .collection('blogs')
+        .where('isPublished', '==', true)
+        .get();
+
+      snapshot.docs.forEach((doc) => {
+        if (!processedBlogIds.has(doc.id)) {
+          const item = doc.data();
+          const lastMod = item.updatedAt || item.createdAt;
+          blogRoutes.push({
+            url: `${BASE_URL}/blog/${encodeURIComponent(doc.id)}`,
+            lastModified: lastMod ? new Date(lastMod) : now,
+            changeFrequency: 'weekly',
+            priority: 0.8,
+          });
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('[Sitemap] Lỗi lấy bài viết blog từ Firestore:', err);
+  }
+
+  // Nếu DB trống, đưa vào 2 bài viết mẫu mặc định để Google lập chỉ mục ngay
+  if (blogRoutes.length === 0) {
+    blogRoutes.push(
+      {
+        url: `${BASE_URL}/blog/thong-bao-tuyen-sinh-vb2-cand-2026`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.8,
+      },
+      {
+        url: `${BASE_URL}/blog/bi-quyet-dat-diem-cao-tu-luan-xa-hoi`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.8,
+      }
+    );
+  }
+
+  // 3. Danh sách Đề thi CÔNG KHAI từ Firebase (Realtime Database & Firestore)
+  // Chỉ lấy đề có cờ isPublic === true
   const examRoutes: MetadataRoute.Sitemap = [];
   const processedExamIds = new Set<string>();
 
@@ -125,5 +204,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.warn('[Sitemap] Lỗi lấy đề thi từ Firestore:', err);
   }
 
-  return [...staticRoutes, ...examRoutes];
+  return [...staticRoutes, ...blogRoutes, ...examRoutes];
 }
