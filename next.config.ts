@@ -16,7 +16,8 @@ const nextConfig: NextConfig = {
    logging: {
     browserToTerminal: false, // Tắt in cảnh báo [browser] ra terminal
   },
-   serverExternalPackages: ["firebase-admin", "jwks-rsa", "jose"],
+// Ép Next.js biên dịch lại các thư viện gây xung đột ESM/CommonJS
+  transpilePackages: ['jwks-rsa', 'jose'],
 };
 
 
