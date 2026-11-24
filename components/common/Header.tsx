@@ -227,7 +227,7 @@ export default function Header({
                 href="/profile"
                 className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs sm:text-sm transition hidden md:inline whitespace-nowrap"
               >
-                [{displayName}]
+                {displayName}
               </Link>
             ) : (
               <div className="flex items-center gap-2 hidden md:flex shrink-0">
@@ -349,10 +349,10 @@ export default function Header({
                 {isAdmin && (
                   <Link
                     href="/admin"
-                    className="whitespace-nowrap shrink-0 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1 shadow-xs transition active:scale-[0.98]"
+                    className="whitespace-nowrap shrink-0 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-xs transition active:scale-[0.98]"
                     title="Bảng điều khiển Quản trị viên"
                   >
-                    <span>⚙️ Admin</span>
+                    <span>⚙️ Quản trị Admin</span>
                   </Link>
                 )}
 
@@ -361,10 +361,13 @@ export default function Header({
                   <button
                     type="button"
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    className="whitespace-nowrap shrink-0 text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-1.5 transition flex items-center gap-1 cursor-pointer"
+                    className="whitespace-nowrap shrink-0 text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-1.5 transition flex items-center gap-1.5 cursor-pointer py-1 px-2 rounded-xl hover:bg-emerald-900/40"
                   >
-                    <span className="truncate max-w-[140px] xl:max-w-[170px] inline-block">
-                      [{displayName}]
+                    <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[10px] font-black shrink-0">
+                      {displayName.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="truncate max-w-[130px] xl:max-w-[160px] inline-block font-semibold">
+                      {displayName}
                     </span>
                     <ChevronDown
                       className={`w-3.5 h-3.5 transition-transform shrink-0 ${

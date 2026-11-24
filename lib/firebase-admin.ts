@@ -1,9 +1,41 @@
-import { initializeApp, getApps, getApp, cert } from 'firebase-admin/app';
+import { initializeApp, getApps, getApp } from 'firebase-admin/app';
+import type { Credential, GoogleOAuthAccessToken } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { Firestore } from '@google-cloud/firestore';
 import { GoogleAuth, JWT } from 'google-auth-library';
 import fs from 'fs';
 import path from 'path';
+
+// 0. Chặn cảnh báo deprecation từ các dependency nội bộ của Google Cloud (fromJSON / credentials)
+if (typeof process !== 'undefined' && process.emitWarning) {
+  const originalEmitWarning = process.emitWarning.bind(process);
+  process.emitWarning = ((warning: string | Error, ...args: any[]) => {
+    const msg = typeof warning === 'string' ? warning : warning?.message || '';
+    if (
+      msg.includes('fromJSON') ||
+      msg.includes('credentials option is deprecated') ||
+      msg.includes('externally-sourced-credentials')
+    ) {
+      return;
+    }
+    return originalEmitWarning(warning, ...args);
+  }) as any;
+}
+
+if (typeof console !== 'undefined' && console.warn) {
+  const originalWarn = console.warn.bind(console);
+  console.warn = (...args: any[]) => {
+    const msg = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a) || '')).join(' ');
+    if (
+      msg.includes('fromJSON') ||
+      msg.includes('credentials option is deprecated') ||
+      msg.includes('externally-sourced-credentials')
+    ) {
+      return;
+    }
+    originalWarn(...args);
+  };
+}
 
 // 1. Trích xuất thông tin cấu hình Service Account an toàn
 function getServiceAccountInfo() {
@@ -38,24 +70,48 @@ function getServiceAccountInfo() {
 
 const saInfo = getServiceAccountInfo();
 
-// 2. Khởi tạo Firebase Admin App (phục vụ Firebase Auth)
+// 2. Tạo Custom Credential dùng JWT constructor chuẩn mới (loại bỏ hoàn toàn cert() và fromJSON deprecated)
+function createCustomCredential(email: string, key: string): Credential {
+  const jwt = new JWT({
+    email,
+    key,
+    scopes: [
+      'https://www.googleapis.com/auth/cloud-platform',
+      'https://www.googleapis.com/auth/firebase.database',
+      'https://www.googleapis.com/auth/firebase.messaging',
+      'https://www.googleapis.com/auth/identitytoolkit',
+      'https://www.googleapis.com/auth/userinfo.email',
+    ],
+  });
+
+  return {
+    getAccessToken: async (): Promise<GoogleOAuthAccessToken> => {
+      const res = await jwt.getAccessToken();
+      const expiry = jwt.credentials?.expiry_date;
+      const expiresIn = expiry ? Math.max(0, Math.floor((expiry - Date.now()) / 1000)) : 3600;
+      return {
+        access_token: res?.token || '',
+        expires_in: expiresIn || 3600,
+      };
+    },
+  };
+}
+
+// 3. Khởi tạo Firebase Admin App (phục vụ Firebase Auth)
 const adminApp =
   getApps().length === 0
     ? initializeApp({
-        credential: saInfo.privateKey
-          ? cert({
-              projectId: saInfo.projectId,
-              clientEmail: saInfo.clientEmail,
-              privateKey: saInfo.privateKey,
-            })
-          : undefined,
+        credential:
+          saInfo.privateKey && saInfo.clientEmail
+            ? createCustomCredential(saInfo.clientEmail, saInfo.privateKey)
+            : undefined,
         projectId: saInfo.projectId,
       })
     : getApp();
 
 export const adminAuth = getAuth(adminApp);
 
-// 3. Khởi tạo Firestore theo chuẩn mới của Google Cloud:
+// 4. Khởi tạo Firestore theo chuẩn mới của Google Cloud:
 // Sử dụng `JWT` constructor và `auth` object constructor thay cho `credentials` và `fromJSON` đã bị deprecate
 function initFirestoreClient(): Firestore {
   if (saInfo.privateKey) {

@@ -350,7 +350,7 @@ function ResultContent() {
                   Lịch sử upload
                 </Link>
                 <Link href="/profile" className="text-amber-300 hover:text-amber-200 font-semibold uppercase text-xs transition">
-                  [{candidateName || 'TÀI KHOẢN'}]
+                  {candidateName || 'TÀI KHOẢN'}
                 </Link>
               </>
             ) : (
