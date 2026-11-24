@@ -57,7 +57,8 @@ function UploadContent() {
     initialCa ? `Đề thi ${initialCa} - ${PAPER_META[initialCa]?.subject || ''} Bộ Công An 2026` : ''
   );
   const [examDuration, setExamDuration] = useState('150');
-  const [isPublic, setIsPublic] = useState(false);
+  const queryPublic = searchParams.get('public') === 'true';
+  const [isPublic, setIsPublic] = useState(queryPublic);
 
   const [isParsing, setIsParsing] = useState(false);
   const [parsingStep, setParsingStep] = useState<string>('');

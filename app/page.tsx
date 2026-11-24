@@ -10,9 +10,15 @@ import {
   AlertCircle,
   PlayCircle,
   Sparkles,
+  BookOpen,
+  Calendar,
+  ChevronRight,
+  Shield,
+  ArrowRight,
 } from 'lucide-react';
 import { PaperCode, PAPER_META } from '@/types/exam';
 import Header from '@/components/common/Header';
+import { BlogPost } from '@/app/api/blogs/route';
 
 interface Candidate {
   fullName?: string;
@@ -21,6 +27,7 @@ interface Candidate {
   email?: string;
   uid?: string;
   id?: string;
+  role?: string;
 }
 
 interface ExamDoc {
@@ -48,6 +55,8 @@ export default function HomePage() {
   const [activeCaTab, setActiveCaTab] = useState<'ALL' | 'CA1' | 'CA2' | 'CA3' | 'CA4'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState<'ALL' | 'FREE' | 'USER'>('ALL');
+  const [latestBlogs, setLatestBlogs] = useState<BlogPost[]>([]);
+  const [isLoadingBlogs, setIsLoadingBlogs] = useState(true);
 
   // Load candidate info từ localStorage
   useEffect(() => {
@@ -63,6 +72,29 @@ export default function HomePage() {
 
   const currentUserId = candidate?.uid || candidate?.id || candidate?.sbd || candidate?.email || '';
   const currentUserEmail = candidate?.email || '';
+  const isAdmin = Boolean(
+    candidate?.role === 'admin' ||
+    candidate?.username?.toLowerCase() === 'admin' ||
+    candidate?.sbd?.toUpperCase() === 'ADMIN'
+  );
+
+  // Tải danh sách bài viết blog mới nhất từ Admin
+  const fetchLatestBlogs = useCallback(async () => {
+    setIsLoadingBlogs(true);
+    try {
+      const res = await fetch('/api/blogs');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLatestBlogs(data.slice(0, 3));
+        }
+      }
+    } catch {
+      setLatestBlogs([]);
+    } finally {
+      setIsLoadingBlogs(false);
+    }
+  }, []);
 
   // 1. Tải đề thi CÁ NHÂN từ Firebase (của người nào người đó xem)
   const fetchUserExams = useCallback(async () => {
@@ -124,7 +156,8 @@ export default function HomePage() {
   useEffect(() => {
     fetchUserExams();
     fetchPublicExams();
-  }, [fetchUserExams, fetchPublicExams]);
+    fetchLatestBlogs();
+  }, [fetchUserExams, fetchPublicExams, fetchLatestBlogs]);
 
   const caCategories = [
     {
@@ -200,7 +233,15 @@ export default function HomePage() {
               Hệ thống lưu trữ đề thi cá nhân bảo mật theo từng tài khoản và ngân hàng đề thi chuẩn Bộ Công An.
             </p>
           </div>
-          <div>
+          <div className="flex items-center gap-3">
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-md transition active:scale-[0.98] flex items-center gap-1.5"
+              >
+                <span>⚙️ Bảng Quản trị Admin</span>
+              </Link>
+            )}
             <button
               onClick={() => {
                 if (!candidate) {
@@ -479,19 +520,34 @@ export default function HomePage() {
           <div className="space-y-4 pt-4 border-t border-slate-200/80">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
-                  Bộ đề miễn phí (Đề công khai do Admin đăng)
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                    Bộ đề miễn phí (Đề công khai do Admin đăng)
+                  </h2>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                    Mở toàn Web
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500">
                   Các đề thi chuẩn được Ban Quản trị đăng tải công khai cho toàn bộ thí sinh
                 </p>
               </div>
-              <Link
-                href="/select-exam"
-                className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline"
-              >
-                Xem tất cả ngân hàng đề &rarr;
-              </Link>
+              <div className="flex items-center gap-3">
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-xl transition flex items-center gap-1"
+                  >
+                    <span>⚙️ Quản lý Đề Công Khai (Admin)</span>
+                  </Link>
+                )}
+                <Link
+                  href="/select-exam"
+                  className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline"
+                >
+                  Xem tất cả ngân hàng đề &rarr;
+                </Link>
+              </div>
             </div>
 
             {isLoadingPublicExams ? (
@@ -544,6 +600,90 @@ export default function HomePage() {
             )}
           </div>
         )}
+
+        {/* SECTION 3: TIN TỨC & BÀI VIẾT BLOG CỦA ADMIN */}
+        <div className="space-y-4 pt-6 border-t border-slate-200/80">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                  Tin tức & Cẩm nang ôn thi mới nhất
+                </h2>
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  Ban Quản Trị
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Thông báo tuyển sinh, bí quyết làm bài tự luận và cẩm nang ôn thi trực tiếp từ Admin
+              </p>
+            </div>
+            <Link
+              href="/blog"
+              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline flex items-center gap-1"
+            >
+              <span>Xem tất cả tin tức</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {isLoadingBlogs ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-3xl p-5 border border-slate-200 animate-pulse space-y-3">
+                  <div className="h-32 bg-slate-200 rounded-2xl w-full" />
+                  <div className="h-5 bg-slate-200 rounded w-3/4" />
+                  <div className="h-4 bg-slate-200 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : latestBlogs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {latestBlogs.map((b) => (
+                <div
+                  key={b.id}
+                  className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition"
+                >
+                  <div>
+                    {b.coverImage && (
+                      <div className="h-36 w-full relative overflow-hidden bg-slate-100">
+                        <img
+                          src={b.coverImage}
+                          alt={b.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="p-4 space-y-1.5">
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">
+                        {b.category === 'TIN_TUYEN_SINH'
+                          ? 'Tin Tuyển Sinh'
+                          : b.category === 'KINH_NGHIEM_THI'
+                          ? 'Kinh Nghiệm'
+                          : 'Quy Chế'}
+                      </span>
+                      <h3 className="font-extrabold text-sm text-slate-900 leading-snug line-clamp-2 hover:text-emerald-900">
+                        <Link href={`/blog/${b.slug || b.id}`}>{b.title}</Link>
+                      </h3>
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                        {b.summary}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4 pt-0 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 mt-2">
+                    <span className="text-[11px]">{new Date(b.createdAt).toLocaleDateString('vi-VN')}</span>
+                    <Link
+                      href={`/blog/${b.slug || b.id}`}
+                      className="font-bold text-[#0f2d22] hover:text-emerald-950 flex items-center gap-0.5 text-xs"
+                    >
+                      <span>Đọc tiếp</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </main>
 
       {/* 3. FOOTER */}

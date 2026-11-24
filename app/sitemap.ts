@@ -28,6 +28,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.8,
     },
+    {
+      url: `${BASE_URL}/blog`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
     // 4 Mã ca thi chuyên ngành chuẩn theo cấu trúc Bộ Công An 2026
     {
       url: `${BASE_URL}/exam?ca=CA1`,

@@ -27,6 +27,7 @@ interface CandidateInfo {
   sbd?: string;
   username?: string;
   fullName?: string;
+  role?: string;
 }
 
 interface NavItem {
@@ -67,6 +68,7 @@ function LogoSvg() {
 const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Thư viện đề' },
   { href: '/select-exam', label: 'Ngân hàng đề thi' },
+  { href: '/blog', label: 'Tin tức' },
   { href: '/about', label: 'Giới thiệu' },
   { href: '/import', label: 'Upload đề', requireAuth: true },
   { href: '/upload-history', label: 'Lịch sử upload', requireAuth: true },
@@ -141,6 +143,13 @@ export default function Header({
   };
 
   const displayName = candidate?.fullName || candidate?.username || candidate?.sbd || 'TÀI KHOẢN';
+
+  const isAdmin = Boolean(
+    candidate?.role === 'admin' ||
+    candidate?.username?.toLowerCase() === 'admin' ||
+    candidate?.sbd?.toUpperCase() === 'ADMIN' ||
+    candidate?.email?.toLowerCase().includes('admin')
+  );
 
   // Visible nav items depend on auth state
   const visibleNavItems = NAV_ITEMS.filter((item) => {
@@ -252,54 +261,74 @@ export default function Header({
 
             {/* Auth Section */}
             {candidate ? (
-              <div className="relative" data-user-menu>
-                <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-2 transition flex items-center gap-1 cursor-pointer"
-                >
-                  [{displayName}]
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {/* Dropdown Menu */}
-                {isUserMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl border border-slate-200 shadow-lg py-1.5 text-sm z-50">
-                    <div className="px-4 py-2 border-b border-slate-100">
-                      <div className="font-bold text-slate-900 text-xs truncate">
-                        {candidate.fullName || candidate.username}
-                      </div>
-                      <div className="text-[11px] text-slate-500 truncate">
-                        {candidate.email || candidate.sbd}
-                      </div>
-                    </div>
-                    <Link
-                      href="/profile"
-                      className="block px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
-                    >
-                      Thông tin cá nhân
-                    </Link>
-                    <Link
-                      href="/upload-history"
-                      className="block px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
-                    >
-                      Lịch sử upload
-                    </Link>
-                    <Link
-                      href="/result"
-                      className="block px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
-                    >
-                      Lịch sử làm đề
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      disabled={isLoggingOut}
-                      className="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition flex items-center gap-2 cursor-pointer"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>{isLoggingOut ? 'Đang thoát...' : 'Đăng xuất'}</span>
-                    </button>
-                  </div>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1 shadow-xs transition active:scale-[0.98]"
+                    title="Vào trang Quản trị viên (Upload đề công khai, Viết blog)"
+                  >
+                    <span>⚙️ Quản trị Admin</span>
+                  </Link>
                 )}
+
+                <div className="relative" data-user-menu>
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="text-amber-300 hover:text-amber-200 font-semibold uppercase tracking-wider text-xs sm:text-sm pl-2 transition flex items-center gap-1 cursor-pointer"
+                  >
+                    [{displayName}]
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl border border-slate-200 shadow-lg py-1.5 text-sm z-50">
+                      <div className="px-4 py-2 border-b border-slate-100">
+                        <div className="font-bold text-slate-900 text-xs truncate">
+                          {candidate.fullName || candidate.username}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {candidate.email || candidate.sbd}
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          className="block px-4 py-2 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 transition border-b border-amber-100"
+                        >
+                          ⚙️ Bảng Quản trị viên (Admin)
+                        </Link>
+                      )}
+                      <Link
+                        href="/profile"
+                        className="block px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        Thông tin cá nhân
+                      </Link>
+                      <Link
+                        href="/upload-history"
+                        className="block px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        Lịch sử upload
+                      </Link>
+                      <Link
+                        href="/result"
+                        className="block px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        Lịch sử làm đề
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition flex items-center gap-2 cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>{isLoggingOut ? 'Đang thoát...' : 'Đăng xuất'}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 sm:gap-3 pl-2">
@@ -354,6 +383,14 @@ export default function Header({
             <div className="border-t border-emerald-900/60 pt-3 mt-3 space-y-1">
               {candidate ? (
                 <>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="block px-4 py-2.5 rounded-xl text-sm font-black bg-amber-400 text-slate-950 shadow-xs mb-1 text-center"
+                    >
+                      ⚙️ BẢNG ĐIỀU KHIỂN QUẢN TRỊ VIÊN
+                    </Link>
+                  )}
                   <Link
                     href="/profile"
                     className="block px-4 py-2.5 rounded-xl text-sm font-semibold text-amber-300 hover:text-amber-200 hover:bg-emerald-900/40 transition"
